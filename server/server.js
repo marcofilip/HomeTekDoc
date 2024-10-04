@@ -91,6 +91,75 @@ app.post('/utenti', (req, res) => {
     });
 });
 
+app.put('/utenti/:user', (req, res) => {
+    const { username } = req.params;
+    const { pwd, ruolo } = req.body;
+
+    fs.readFile('utenti.json', 'utf8', (err, data) => {
+        if (err) {
+            res.status(500).send('Errore nella lettura del file utenti.json');
+            return;
+        }
+
+        try {
+            const utenti = JSON.parse(data);
+            const userIndex = utenti.findIndex(u => u.user === username);
+
+            if (userIndex === -1) {
+                res.status(404).send('Utente non trovato');
+                return;
+            }
+
+            utenti[userIndex] = { user: username, pwd, ruolo };
+
+            fs.writeFile('utenti.json', JSON.stringify(utenti, null, 2), (err) => {
+                if (err) {
+                    res.status(500).send('Errore nella scrittura del file utenti.json');
+                    return;
+                }
+                res.status(200).json(utenti[userIndex]);
+            });
+
+        } catch (err) {
+            res.status(500).send('Errore nel parsing del file utenti.json');
+        }
+    });
+});
+
+// Delete user
+app.delete('/utenti/:user', (req, res) => {
+    const { username } = req.params;
+
+    fs.readFile('utenti.json', 'utf8', (err, data) => {
+        if (err) {
+            res.status(500).send('Errore nella lettura del file utenti.json');
+            return;
+        }
+
+        try {
+            let utenti = JSON.parse(data);
+            const initialLength = utenti.length;
+            utenti = utenti.filter(u => u.user !== username);
+
+            if (utenti.length === initialLength) {
+                res.status(404).send('Utente non trovato');
+                return;
+            }
+
+            fs.writeFile('utenti.json', JSON.stringify(utenti, null, 2), (err) => {
+                if (err) {
+                    res.status(500).send('Errore nella scrittura del file utenti.json');
+                    return;
+                }
+                res.status(200).send('Utente eliminato con successo');
+            });
+
+        } catch (err) {
+            res.status(500).send('Errore nel parsing del file utenti.json');
+        }
+    });
+});
+
 const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Server in esecuzione sulla porta ${PORT}`);
