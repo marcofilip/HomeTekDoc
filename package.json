@@ -1,15 +1,28 @@
 {
-  "name": "api",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "express": "^4.21.1",
+    "sqlite3": "^5.1.7",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "vuetify": "^3.7.3"
   },
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "sites": "cd sites && npm run serve",
+    "server": "cd server && node server.js",
+    "dev": "concurrently \"npm run sites\" \"npm run server\""
+  },
+  "name": "login_test",
+  "version": "1.0.0",
+  "main": "server.js",
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "body-parser": "^1.20.3",
-    "express": "^4.21.0"
+  "description": "",
+  "devDependencies": {
+    "concurrently": "^9.0.1"
   }
 }

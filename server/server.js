@@ -1,166 +1,214 @@
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 const express = require('express');
-const bodyParser = require('body-parser');
-const fs = require('fs'); //modulo per leggere i file
-
-//creiamo l'applicazione Express
 const app = express();
+const swaggerSetup = require('../swagger');
+const exampleRouter = require('../routes/example');
+const cors = require('cors');
+const port = 3000;
 
-//Middleware pe rparsare il body delle richieste in formato JSON
-app.use(bodyParser.json());
-
-//Endpoint di login
-app.post('/login', (req, res) => {
-    const {username, password} = req.body;
-    console.log(`Richiesta di login per l'utente ${username}`);
-    console.log(`Password: ${password}`);
-
-    fs.readFile('utenti.json', 'utf8', (err, data) => {
-        if (err) {
-            res.status(500).send('Errore nella lettura del file utenti.json');
-            return;
-        }
-
-        try {
-            const utenti = JSON
-            const user = utenti.find(u => u.user === username && u.pwd === password);
-
-            if (user) {
-                res.status(200).json({
-                    "status": "OK",
-                    "user": user.user,
-                    "ruolo": user.ruolo
-                });
-            } else {
-                res.status(401).json({ message: `Credenziali non valide` });
-            }
-        } catch (err) {
-            res.status(500).json({ message: `Errore nel parsing del file utenti.json` });
-        }
-})});
-
-//Endpoint per ottenere la lista degli utenti
-app.get('/utenti', (req, res) => {
-    fs.readFile('utenti.json', 'utf8', (err, data) => {
-        if (err) {
-            res.status(500).send('Errore nella lettura del file utenti.json');
-            return;
-        }
-        try {
-            const utenti = JSON.parse(data);
-            res.status(200).json(utenti);
-        } catch (err) {
-            res.status(500).send('Errore nel parsing del file utenti.json');
-        }
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`, {
+        body: req.body,
+        headers: req.headers,
     });
+    next();
 });
 
-//Endpoint per aggiungere un nuovo utente
-app.post('/utenti', (req, res) => {
-    const { user, pwd, ruolo } = req.body;
+const dbPath = path.join(__dirname, 'database.db');
+console.log('Database path:', dbPath);
 
-    if (!user || !pwd || !ruolo) {
-        return res.status(400).send('I campi user, pwd e ruolo sono obbligatori');
+let db = new sqlite3.Database(dbPath, (err) => {
+    if (err) return console.error('Database connection error:', err.message);
+    console.log('Connected to SQLite database at:', dbPath);
+});
+
+db.run(`CREATE TABLE IF NOT EXISTS auth_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    email TEXT NOT NULL,
+    citta TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT 0
+)`, (err) => {
+    if (err) {
+        console.error('Error creating auth_users table:', err);
+    } else {
+        console.log('auth_users table is ready');
+        db.get("SELECT * FROM auth_users WHERE username = 'admin'", [], (err, row) => {
+            if (err) {
+                console.error('Error checking admin user:', err);
+            } else if (!row) {
+                db.run(`INSERT INTO auth_users (username, password, nome, email, citta, is_admin) 
+                       VALUES ('admin', 'admin123', 'Admin', 'admin@gmail.com', 'AdminLandia', 1)`,
+                    (err) => {
+                        if (err) {
+                            console.error('Error creating admin user:', err);
+                        } else {
+                            console.log('Admin user created successfully');
+                        }
+                    });
+            }
+        });
+    }
+});
+
+app.post('/auth/register', (req, res) => {
+    console.log('Received registration request:', req.body);
+    const { username, password, nome, email, citta } = req.body;
+
+    if (!username || !password || !nome || !email || !citta) {
+        return res.status(400).json({ error: 'All fields are required' });
     }
 
-    fs.readFile('utenti.json', 'utf8', (err, data) => {
+    const query = `
+        INSERT INTO auth_users (username, password, nome, email, citta, is_admin)
+        VALUES (?, ?, ?, ?, ?, 0) -- non-admin by default
+    `;
+
+    db.run(query, [username, password, nome, email, citta], function (err) {
         if (err) {
-            res.status(500).send('Errore nella lettura del file utenti.json. \nErr: ' + err);
-            return;
-        }
-        try {
-            const utenti = JSON.parse(data);
-            const userExists = utenti.find(u => u.user === user);
-            if (userExists) {
-                res.status(400).send('Utente già presente');
-                return;
+            console.error('Registration error:', err);
+            if (err.message.includes('UNIQUE constraint failed')) {
+                return res.status(400).json({ error: 'Username already exists' });
             }
-            const nuovoUtente = { user, pwd, ruolo };
-            utenti.push(nuovoUtente);
-
-            fs.writeFile('utenti.json', JSON.stringify(utenti, null, 2), (err) => {
-                if (err) {
-                    res.status(500).send('Errore nella scrittura del file utenti.json');
-                    return;
-                }
-                res.status(201).json(nuovoUtente);
-            });
-
-        } catch (err) {
-            res.status(500).send('Errore nel parsing del file utenti.json');
+            return res.status(500).json({ error: err.message });
         }
+        console.log('User registered successfully');
+        res.json({ message: 'User registered successfully' });
     });
 });
 
-app.put('/utenti/:user', (req, res) => {
-    const { username } = req.params;
-    const { pwd, ruolo } = req.body;
+app.post('/auth/login', (req, res) => {
+    console.log('Login attempt:', req.body);
+    const { username, password } = req.body;
 
-    fs.readFile('utenti.json', 'utf8', (err, data) => {
-        if (err) {
-            res.status(500).send('Errore nella lettura del file utenti.json');
-            return;
-        }
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+    }
 
-        try {
-            const utenti = JSON.parse(data);
-            const userIndex = utenti.findIndex(u => u.user === username);
-
-            if (userIndex === -1) {
-                res.status(404).send('Utente non trovato');
-                return;
+    db.get('SELECT * FROM auth_users WHERE username = ? AND password = ?',
+        [username, password],
+        (err, user) => {
+            if (err) {
+                console.error('Login error:', err);
+                return res.status(500).json({ error: err.message });
             }
-
-            utenti[userIndex] = { user: username, pwd, ruolo };
-
-            fs.writeFile('utenti.json', JSON.stringify(utenti, null, 2), (err) => {
-                if (err) {
-                    res.status(500).send('Errore nella scrittura del file utenti.json');
-                    return;
-                }
-                res.status(200).json(utenti[userIndex]);
+            if (!user) {
+                console.log('Invalid login attempt');
+                return res.status(401).json({ error: 'Invalid username or password' });
+            }
+            console.log('User found:', user);
+            res.json({
+                message: 'Login successful',
+                username: user.username,
+                isAdmin: user.is_admin === 1
             });
-
-        } catch (err) {
-            res.status(500).send('Errore nel parsing del file utenti.json');
         }
+    );
+});
+
+app.post('/utenti', (req, res) => {
+    console.log('Received POST request:', req.body);
+    const { nome, email, citta } = req.body;
+
+    const query = `
+        INSERT INTO auth_users (username, password, nome, email, citta, is_admin) 
+        VALUES (?, 'default_password', ?, ?, ?, 0)  -- Default password and non-admin users
+    `;
+
+    db.run(query, [email, nome, email, citta], function (err) {
+        if (err) {
+            console.error('Database insertion error:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log('User inserted successfully, ID:', this.lastID);
+        res.json({ message: 'Nuovo utente creato', id: this.lastID });
     });
 });
 
-// Delete user
-app.delete('/utenti/:user', (req, res) => {
-    const { username } = req.params;
-
-    fs.readFile('utenti.json', 'utf8', (err, data) => {
+app.get('/utenti', (req, res) => {
+    console.log('Received GET request for users');
+    db.all(`SELECT id, nome, email, citta FROM auth_users WHERE is_admin = 0`, [], (err, rows) => {
         if (err) {
-            res.status(500).send('Errore nella lettura del file utenti.json');
-            return;
+            console.error('Database query error:', err);
+            return res.status(500).json({ error: err.message });
         }
-
-        try {
-            let utenti = JSON.parse(data);
-            const initialLength = utenti.length;
-            utenti = utenti.filter(u => u.user !== username);
-
-            if (utenti.length === initialLength) {
-                res.status(404).send('Utente non trovato');
-                return;
-            }
-
-            fs.writeFile('utenti.json', JSON.stringify(utenti, null, 2), (err) => {
-                if (err) {
-                    res.status(500).send('Errore nella scrittura del file utenti.json');
-                    return;
-                }
-                res.status(200).send('Utente eliminato con successo');
-            });
-
-        } catch (err) {
-            res.status(500).send('Errore nel parsing del file utenti.json');
-        }
+        console.log('Retrieved users (excluding admin):', rows);
+        res.json({ utenti: rows });
     });
 });
 
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`Server in esecuzione sulla porta ${PORT}`);
+app.put('/utenti/:id', (req, res) => {
+    const { id } = req.params;
+    const { nome, email, citta } = req.body;
+    db.run(
+        `UPDATE utenti SET nome = ?, email = ?, citta = ? WHERE id = ?`,
+        [nome, email, citta, id],
+        function (err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            if (this.changes === 0) {
+                return res.status(404).json({ message: `Utente ${id} non trovato` });
+            }
+            res.json({ message: `Utente ${id} modificato` });
+        }
+    );
+});
+
+app.delete('/utenti/:id', (req, res) => {
+    const { id } = req.params;
+    console.log('Received DELETE request for user ID:', id); // Debugging
+
+    db.run(`DELETE FROM auth_users WHERE id = ?`, [id], function (err) {
+        if (err) {
+            console.error('Database deletion error:', err);
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (this.changes === 0) {
+            console.log('No user found with ID:', id);
+            return res.status(404).json({ error: `Utente ${id} non trovato` });
+        }
+
+        console.log('Successfully deleted user with ID:', id);
+        res.json({ message: `Utente ${id} eliminato`, success: true });
+    });
+});
+
+app.get('/utenti/citta/:city', (req, res) => {
+    const citta = req.params.city;
+    db.all(`SELECT * FROM utenti WHERE citta = ?`, [citta], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.json({ utenti: rows });
+    });
+});
+
+app.use('/api', exampleRouter);
+
+app.get('/test', (req, res) => {
+    res.send('Server is working');
+});
+
+swaggerSetup(app);
+
+process.on('SIGINT', () => {
+    db.close((err) => {
+        if (err) {
+            return console.error(err.message);
+        }
+        console.log('Closing the SQLite database.');
+        process.exit(0);
+    });
+});
+
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running at http://65.109.163.183:${port}`);
 });
