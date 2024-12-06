@@ -33,7 +33,8 @@ db.run(`CREATE TABLE IF NOT EXISTS auth_users (
     nome TEXT NOT NULL,
     email TEXT NOT NULL,
     citta TEXT NOT NULL,
-    is_admin BOOLEAN DEFAULT 0
+    indirizzo TEXT NOT NULL,
+    role TEXT CHECK(role IN ('cliente', 'tecnico', 'admin')) NOT NULL
 )`, (err) => {
     if (err) {
         console.error('Error creating auth_users table:', err);
@@ -43,8 +44,8 @@ db.run(`CREATE TABLE IF NOT EXISTS auth_users (
             if (err) {
                 console.error('Error checking admin user:', err);
             } else if (!row) {
-                db.run(`INSERT INTO auth_users (username, password, nome, email, citta, is_admin) 
-                       VALUES ('admin', 'admin123', 'Admin', 'admin@gmail.com', 'AdminLandia', 1)`,
+                db.run(`INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role) 
+                       VALUES ('admin', 'GreatestAdmin3v3r', 'Admin', 'admin@gmail.com', 'AdminLandia', 'Administrator', 'admin')`,
                     (err) => {
                         if (err) {
                             console.error('Error creating admin user:', err);
@@ -59,18 +60,18 @@ db.run(`CREATE TABLE IF NOT EXISTS auth_users (
 
 app.post('/auth/register', (req, res) => {
     console.log('Received registration request:', req.body);
-    const { username, password, nome, email, citta } = req.body;
+    const { username, password, nome, email, citta, indirizzo, role } = req.body;
 
-    if (!username || !password || !nome || !email || !citta) {
+    if (!username || !password || !nome || !email || !citta || !indirizzo || !role) {
         return res.status(400).json({ error: 'All fields are required' });
     }
 
     const query = `
-        INSERT INTO auth_users (username, password, nome, email, citta, is_admin)
-        VALUES (?, ?, ?, ?, ?, 0) -- non-admin by default
+        INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
-    db.run(query, [username, password, nome, email, citta], function (err) {
+    db.run(query, [username, password, nome, email, citta, indirizzo, role], function (err) {
         if (err) {
             console.error('Registration error:', err);
             if (err.message.includes('UNIQUE constraint failed')) {
@@ -106,7 +107,8 @@ app.post('/auth/login', (req, res) => {
             res.json({
                 message: 'Login successful',
                 username: user.username,
-                isAdmin: user.is_admin === 1
+                isAdmin: user.role === 'admin',
+                role: user.role // Include the user's role in the response
             });
         }
     );
@@ -114,14 +116,14 @@ app.post('/auth/login', (req, res) => {
 
 app.post('/utenti', (req, res) => {
     console.log('Received POST request:', req.body);
-    const { nome, email, citta } = req.body;
+    const { nome, email, citta, indirizzo } = req.body;
 
     const query = `
-        INSERT INTO auth_users (username, password, nome, email, citta, is_admin) 
-        VALUES (?, 'default_password', ?, ?, ?, 0)  -- Default password and non-admin users
+        INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role) 
+        VALUES (?, 'default_password', ?, ?, ?, ?, 'cliente')  -- Default role is 'cliente'
     `;
 
-    db.run(query, [email, nome, email, citta], function (err) {
+    db.run(query, [email, nome, email, citta, indirizzo], function (err) {
         if (err) {
             console.error('Database insertion error:', err);
             return res.status(500).json({ error: err.message });
@@ -133,22 +135,39 @@ app.post('/utenti', (req, res) => {
 
 app.get('/utenti', (req, res) => {
     console.log('Received GET request for users');
-    db.all(`SELECT id, nome, email, citta FROM auth_users WHERE is_admin = 0`, [], (err, rows) => {
+    db.all(`SELECT id, nome, email, citta, indirizzo, role FROM auth_users WHERE role IN ('cliente', 'tecnico')`, [], (err, rows) => {
         if (err) {
             console.error('Database query error:', err);
             return res.status(500).json({ error: err.message });
         }
-        console.log('Retrieved users (excluding admin):', rows);
+        console.log('Retrieved users:', rows);
+        res.json({ utenti: rows });
+    });
+});
+
+app.get('/utenti/filtrati', (req, res) => {
+    const { role } = req.query;
+    if (!role || !['cliente', 'tecnico', 'admin'].includes(role)) {
+        return res.status(400).json({ error: 'Valid role parameter is required' });
+    }
+
+    const query = `SELECT id, nome, email, citta FROM auth_users WHERE role = ?`;
+    db.all(query, [role], (err, rows) => {
+        if (err) {
+            console.error('Database query error:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log('Filtered users:', rows);
         res.json({ utenti: rows });
     });
 });
 
 app.put('/utenti/:id', (req, res) => {
     const { id } = req.params;
-    const { nome, email, citta } = req.body;
+    const { nome, email, citta, indirizzo } = req.body;
     db.run(
-        `UPDATE utenti SET nome = ?, email = ?, citta = ? WHERE id = ?`,
-        [nome, email, citta, id],
+        `UPDATE auth_users SET nome = ?, email = ?, citta = ?, indirizzo = ? WHERE id = ?`,
+        [nome, email, citta, indirizzo, id],
         function (err) {
             if (err) {
                 return res.status(500).json({ error: err.message });

@@ -20,6 +20,9 @@
                   <v-list-item-subtitle>
                     Città: {{ user.citta }}
                   </v-list-item-subtitle>
+                  <v-list-item-subtitle>
+                    Ruolo: {{ user.role }}
+                  </v-list-item-subtitle>
                 </v-list-item-content>
                 <v-list-item-action>
                   <v-btn icon color="error" @click="confirmDelete(user.id)">
@@ -55,6 +58,15 @@
       </v-card>
     </v-dialog>
   </v-container>
+  <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
+    {{ snackbar.text }}
+    <template v-slot:action="{ attrs }">
+      <v-btn text v-bind="attrs" @click="snackbar.show = false">
+        Chiudi
+      </v-btn>
+    </template>
+  </v-snackbar>
+
 </template>
 
 <script>
@@ -65,7 +77,14 @@ export default {
       newUser: {
         nome: '',
         email: '',
-        citta: ''
+        citta: '',
+        indirizzo: '',
+        role: '' // Ensure role is included
+      },
+      snackbar: {
+        show: false,
+        text: '',
+        color: ''
       },
       deleteDialog: false,
       userToDelete: null
@@ -75,6 +94,13 @@ export default {
     this.loadUsers()
   },
   methods: {
+
+    showSnackbar(text, color) {
+      this.snackbar.text = text;
+      this.snackbar.color = color;
+      this.snackbar.show = true;
+    },
+
     async loadUsers() {
       try {
         const response = await fetch('http://65.109.163.183:3000/utenti')
@@ -86,7 +112,9 @@ export default {
           id: user.id,
           nome: user.nome,
           email: user.email,
-          citta: user.citta
+          citta: user.citta,
+          indirizzo: user.indirizzo,
+          role: user.role // Ensure role is included
         }));
 
       } catch (error) {
@@ -94,8 +122,6 @@ export default {
         this.showSnackbar('Errore nel caricamento degli utenti', 'error')
       }
     },
-
-
     async submitUser() {
       if (!this.$refs.form.validate()) return
 
@@ -115,7 +141,9 @@ export default {
         this.newUser = {
           nome: '',
           email: '',
-          citta: ''
+          citta: '',
+          indirizzo: '',
+          role: '' // Reset role
         }
         await this.loadUsers()
       } catch (error) {

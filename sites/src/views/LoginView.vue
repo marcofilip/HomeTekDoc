@@ -103,14 +103,17 @@ export default {
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('isAdmin', data.isAdmin);
         localStorage.setItem('username', data.username);
+        localStorage.setItem('role', data.role); // Store the user's role
 
         this.showSnackbarMessage('Login successful!', 'success');
 
         setTimeout(() => {
           if (data.isAdmin) {
-            this.$router.push('/gestione-utenti');
+            this.$router.push('/utenti'); // Redirect to UtentiView for admin
+          } else if (data.role === 'tecnico') {
+            this.$router.push('/tecnico');
           } else {
-            this.$router.push('/');
+            this.$router.push('/cliente');
           }
         }, 1000);
       } catch (error) {

@@ -33,6 +33,14 @@
                 dense :rules="[v => !!v || 'Città richiesta']" class="mb-3">
               </v-text-field>
 
+              <!-- Indirizzo Field -->
+              <v-text-field v-model="registerData.indirizzo" prepend-inner-icon="mdi-map-marker" label="Indirizzo" type="text"
+                outlined dense :rules="[
+                  v => !!v || 'Indirizzo richiesto',
+                  v => /^[a-zA-Z0-9\s,.'-]{3,}$/.test(v) || 'Inserisci un indirizzo valido.'
+                ]" class="mb-3">
+              </v-text-field>
+
               <!-- Password Field -->
               <v-text-field v-model="registerData.password" prepend-inner-icon="mdi-lock" label="Password"
                 :type="showPassword ? 'text' : 'password'" outlined dense :rules="[
@@ -49,6 +57,17 @@
                   v => v === registerData.password || 'Le password sono differenti.'
                 ]">
               </v-text-field>
+
+              <!-- Role Selection Field -->
+              <v-select
+                v-model="registerData.role"
+                :items="roles"
+                label="Role"
+                outlined
+                dense
+                prepend-inner-icon="mdi-account-cog"
+                class="mb-3"
+              ></v-select>
 
               <!-- Submit Button -->
               <v-btn type="submit" color="primary" block x-large elevation="2" :loading="loading" class="mt-4">
@@ -88,8 +107,15 @@ export default {
         password: '',
         nome: '',  // Added name field
         email: '', // Added email field
-        citta: ''  // Added city field
+        citta: '',  // Added city field
+        role: 'cliente',  // Default role
+        indirizzo: '' // Changed to indirizzo
       },
+      roles: [
+        'cliente',
+        'tecnico'
+        // Note: 'admin' role is not available during registration
+      ],
       confirmPassword: '',
       showPassword: false,
       loading: false,
@@ -132,7 +158,9 @@ export default {
           password: '',
           nome: '',
           email: '',
-          citta: ''
+          citta: '',
+          role: '', // Reset role
+          indirizzo: '' // Reset indirizzo
         };
         this.confirmPassword = '';
 

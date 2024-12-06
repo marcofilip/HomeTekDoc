@@ -4,10 +4,26 @@
     <router-link to="/about">About</router-link> |
     <router-link to="/login">Login</router-link> |
     <router-link to="/register">Register</router-link> |
-    <router-link to="/utenti">Utenti</router-link>
+    <router-link to="/utenti">Utenti</router-link> |
+    <router-link to="/cliente" @click.native="checkRole('cliente')">Cliente</router-link> |
+    <router-link to="/tecnico" @click.native="checkRole('tecnico')">Tecnico</router-link>
   </nav>
   <router-view/>
 </template>
+
+<script>
+export default {
+  methods: {
+    checkRole(role) {
+      const userRole = localStorage.getItem('role');
+      if (userRole !== role) {
+        alert('Accesso negato');
+        event.preventDefault();
+      }
+    }
+  }
+}
+</script>
 
 <style>
 #app {
