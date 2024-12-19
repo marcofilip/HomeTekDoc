@@ -5,22 +5,32 @@ import RegisterView from '../views/RegisterView.vue'
 import UtentiView from '../views/UtentiView.vue'
 import ClienteView from '../views/ClienteView.vue'
 import TecnicoView from '../views/TecnicoView.vue'
+import HomeView from '../views/HomeView.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'login',
-    component: LoginView
+    name: 'home',
+    component: HomeView
   },
   {
     path: '/utenti',
     name: 'utenti',
     component: UtentiView,
-    beforeEnter: (to, from, next) => {
-      if (localStorage.getItem('isAdmin') === 'true') {
-        next();
-      } else {
-        alert('Accesso negato: non autorizzato.');
+    beforeEnter: async (to, from, next) => {
+      try {
+        const response = await fetch('http://65.109.163.183:3000/auth/check', {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        if (data.authenticated && data.user.isAdmin) {
+          next();
+        } else {
+          alert('Accesso negato: non autorizzato.');
+          next('/login');
+        }
+      } catch (error) {
+        alert('Errore di autenticazione.');
         next('/login');
       }
     }
@@ -51,6 +61,12 @@ const routes = [
     name: 'tecnico',
     component: TecnicoView,
     meta: { requiresAuth: true, role: 'tecnico' }
+  },
+  {
+    path: '/chat',
+    name: 'chat',
+    component: () => import('../views/ChatView.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 
@@ -59,18 +75,23 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to, from, next) => {
-  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-  const userRole = localStorage.getItem('role');
-
+router.beforeEach(async (to, from, next) => {
   if (to.matched.some(record => record.meta.requiresAuth)) {
-    if (!isLoggedIn) {
+    try {
+      const response = await fetch('http://65.109.163.183:3000/auth/check', {
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (!data.authenticated) {
+        next({ name: 'login' });
+      } else if (to.meta.role && to.meta.role !== data.user.role) {
+        alert('Accesso negato');
+        next('/login');
+      } else {
+        next();
+      }
+    } catch (error) {
       next({ name: 'login' });
-    } else if (to.meta.role && to.meta.role !== userRole) {
-      alert('Accesso negato');
-      next('/login'); // Redirect to login page
-    } else {
-      next();
     }
   } else {
     next();

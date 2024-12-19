@@ -140,6 +140,7 @@ export default {
         const response = await fetch('http://65.109.163.183:3000/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify(this.registerData)
         });
 

@@ -1,18 +1,45 @@
 <template>
-  <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
-  </div>
+  <v-container>
+    <v-row justify="center">
+      <v-col cols="12" md="8">
+        <v-card class="pa-5">
+          <v-card-title class="headline">Welcome to HomeTekDoc</v-card-title>
+          <v-card-text>
+            <p>
+              Sei stanco di dover portare la tua elettronica in negozio per essere riparata?<br>
+              Con HomeTekDoc puoi risparmiare tempo, facendo riparare i tuoi dispositivi direttamente a casa tua!<br>
+            </p>
+          </v-card-text>
+        </v-card>
+        <v-card>
+          <v-card-title>
+            Cosa dicono i nostri utenti?
+          </v-card-title>
+          <v-card-text>
+            <p>
+              <span style="font-style: italic;">Luca</span><br>
+              ⭐⭐⭐⭐⭐<br>
+              "Servizio eccellente! Il tecnico è arrivato puntuale e ha riparato il mio laptop in pochissimo tempo.<br><br>
+            </p>
+            <p>
+              <span style="font-style: italic;">Giulia</span><br>
+              ⭐⭐⭐⭐⭐<br>
+              "Ottima esperienza! Il tecnico è stato molto professionale e cortese.<br><br>
+            </p>
+            <p>
+              <span style="font-style: italic;">Marco</span><br>
+              ⭐⭐⭐⭐<br>
+              "Servizio buono, il tecnico è stato molto disponibile e competente.<br><br>
+            </p>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script>
-// @ is an alias to /src
-import HelloWorld from '@/components/HelloWorld.vue'
-
 export default {
-  name: 'HomeView',
-  components: {
-    HelloWorld
-  }
+  name: 'HomeView'
 }
 </script>

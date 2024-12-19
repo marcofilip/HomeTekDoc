@@ -23,6 +23,9 @@
                   <v-list-item-subtitle>
                     Ruolo: {{ user.role }}
                   </v-list-item-subtitle>
+                  <v-list-item-subtitle>
+                    Indirizzo: {{ user.indirizzo }}
+                  </v-list-item-subtitle>
                 </v-list-item-content>
                 <v-list-item-action>
                   <v-btn icon color="error" @click="confirmDelete(user.id)">
@@ -103,7 +106,9 @@ export default {
 
     async loadUsers() {
       try {
-        const response = await fetch('http://65.109.163.183:3000/utenti')
+        const response = await fetch('http://65.109.163.183:3000/utenti', {
+          credentials: 'include'
+        });
         if (!response.ok) throw new Error('Errore nel caricamento degli utenti')
         const data = await response.json()
         console.log("Fetched data: ", data);
@@ -131,6 +136,7 @@ export default {
           headers: {
             'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify(this.newUser)
         })
 
@@ -162,7 +168,8 @@ export default {
       try {
         console.log('Deleting user with ID:', this.userToDelete); // Debugging
         const response = await fetch(`http://65.109.163.183:3000/utenti/${this.userToDelete}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          credentials: 'include'
         });
 
         if (!response.ok) throw new Error('Errore nell\'eliminazione dell\'utente');

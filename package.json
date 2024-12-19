@@ -2,12 +2,17 @@
   "dependencies": {
     "@mdi/font": "^7.4.47",
     "axios": "^1.7.7",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^4.21.1",
+    "express-session": "^1.18.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "sqlite3": "^5.1.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "vuetify": "^3.7.3"
+    "vuetify": "^3.7.3",
+    "ws": "^8.18.0"
   },
   "scripts": {
     "serve": "vue-cli-service serve",

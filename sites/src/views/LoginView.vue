@@ -72,52 +72,36 @@ export default {
 
       this.loading = true;
       try {
-        // Use the full URL during development
         const response = await fetch('http://65.109.163.183:3000/auth/login', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify(this.loginData)
         });
 
-
-        const responseText = await response.text();
-        console.log('Raw response:', responseText);
-
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (e) {
-          console.error('Parse error:', e);
-          throw new Error('Invalid server response');
-        }
-
+        const data = await response.json();
+        
         if (!response.ok) {
-          throw new Error(data.error || 'Login failed');
+          throw new Error(data.error);
         }
 
-        console.log('Login successful:', data);
-
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('isAdmin', data.isAdmin);
-        localStorage.setItem('username', data.username);
-        localStorage.setItem('role', data.role); // Store the user's role
+        localStorage.setItem('role', data.user.role); // Store role in localStorage
 
         this.showSnackbarMessage('Login successful!', 'success');
-
+        
         setTimeout(() => {
-          if (data.isAdmin) {
-            this.$router.push('/utenti'); // Redirect to UtentiView for admin
-          } else if (data.role === 'tecnico') {
-            this.$router.push('/tecnico');
-          } else {
-            this.$router.push('/cliente');
-          }
+          const redirect = {
+            admin: '/utenti',
+            tecnico: '/tecnico',
+            cliente: '/cliente'
+          }[data.user.role] || '/';
+          
+          this.$router.push(redirect);
         }, 1000);
+
       } catch (error) {
-        console.error('Login error:', error);
         this.showSnackbarMessage(error.message, 'error');
       } finally {
         this.loading = false;

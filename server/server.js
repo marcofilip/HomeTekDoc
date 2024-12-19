@@ -1,15 +1,63 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const express = require('express');
+const session = require('express-session');
 const app = express();
 const swaggerSetup = require('../swagger');
 const exampleRouter = require('../routes/example');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const port = 3000;
 
-app.use(cors());
+const http = require('http').createServer(app);
+const io = require('socket.io')(http, {
+    cors: {
+        origin: "http://65.109.163.183:8080",
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
+
+let connectedUsers = 0;
+
+io.on('connection', (socket) => {
+    connectedUsers++;
+    io.emit('userCount', connectedUsers);
+
+    socket.on('chat message', (msg) => {
+        io.emit('chat message', {
+            text: msg.text,
+            username: msg.username,
+            timestamp: new Date()
+        });
+    });
+
+    socket.on('disconnect', () => {
+        connectedUsers--;
+        io.emit('userCount', connectedUsers);
+    });
+});
+
+app.use(cors({
+    origin: 'http://65.109.163.183:8080',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(session({
+    secret: 'your_secret_key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    },
+    store: new session.MemoryStore()
+}));
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.path}`, {
         body: req.body,
@@ -18,7 +66,21 @@ app.use((req, res, next) => {
     next();
 });
 
+const auth = (req, res, next) => {
+    if (req.session && req.session.user) {
+        return next();
+    }
+    return res.status(401).json({ error: 'Unauthorized' });
+};
+
+// Uncomment the following line to use the actual database
 const dbPath = path.join(__dirname, 'database.db');
+
+// Uncomment the following lines to use the mock database
+// const dbPath = path.join(__dirname, 'mock.db');
+// const db = require('./mock');
+
+// Comment the following block if using the mock database module
 console.log('Database path:', dbPath);
 
 let db = new sqlite3.Database(dbPath, (err) => {
@@ -57,6 +119,7 @@ db.run(`CREATE TABLE IF NOT EXISTS auth_users (
         });
     }
 });
+
 
 app.post('/auth/register', (req, res) => {
     console.log('Received registration request:', req.body);
@@ -104,14 +167,52 @@ app.post('/auth/login', (req, res) => {
                 return res.status(401).json({ error: 'Invalid username or password' });
             }
             console.log('User found:', user);
-            res.json({
-                message: 'Login successful',
+
+            req.session.user = {
                 username: user.username,
                 isAdmin: user.role === 'admin',
-                role: user.role // Include the user's role in the response
+                role: user.role
+            };
+
+            res.cookie('user_role', user.role, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                maxAge: 24 * 60 * 60 * 1000
+            });
+
+            res.json({
+                message: 'Login successful',
+                user: {
+                    username: user.username,
+                    role: user.role,
+                    isAdmin: user.role === 'admin'
+                }
             });
         }
     );
+});
+
+app.get('/auth/logout', (req, res) => {
+    req.session.destroy(err => {
+        if (err) {
+            return res.status(500).json({ error: 'Logout failed' });
+        }
+        res.clearCookie('connect.sid');
+        res.json({ message: 'Logout successful' });
+    });
+});
+
+app.get('/auth/check', (req, res) => {
+    if (req.session && req.session.user) {
+        res.json({
+            authenticated: true,
+            user: req.session.user
+        });
+    } else {
+        res.json({
+            authenticated: false
+        });
+    }
 });
 
 app.post('/utenti', (req, res) => {
@@ -133,7 +234,7 @@ app.post('/utenti', (req, res) => {
     });
 });
 
-app.get('/utenti', (req, res) => {
+app.get('/utenti', auth, (req, res) => {
     console.log('Received GET request for users');
     db.all(`SELECT id, nome, email, citta, indirizzo, role FROM auth_users WHERE role IN ('cliente', 'tecnico')`, [], (err, rows) => {
         if (err) {
@@ -182,7 +283,7 @@ app.put('/utenti/:id', (req, res) => {
 
 app.delete('/utenti/:id', (req, res) => {
     const { id } = req.params;
-    console.log('Received DELETE request for user ID:', id); // Debugging
+    console.log('Received DELETE request for user ID:', id);
 
     db.run(`DELETE FROM auth_users WHERE id = ?`, [id], function (err) {
         if (err) {
@@ -224,10 +325,16 @@ process.on('SIGINT', () => {
             return console.error(err.message);
         }
         console.log('Closing the SQLite database.');
+    });
+    mockDb.close((err) => {
+        if (err) {
+            return console.error(err.message);
+        }
+        console.log('Closing the SQLite mock database.');
         process.exit(0);
     });
 });
 
-app.listen(port, '0.0.0.0', () => {
+http.listen(port, '0.0.0.0', () => {
     console.log(`Server running at http://65.109.163.183:${port}`);
 });

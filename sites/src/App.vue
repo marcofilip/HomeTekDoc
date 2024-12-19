@@ -1,38 +1,48 @@
 <template>
-  <nav>
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link> |
-    <router-link to="/login">Login</router-link> |
-    <router-link to="/register">Register</router-link> |
-    <router-link to="/utenti">Utenti</router-link> |
-    <router-link to="/cliente" @click.native="checkRole('cliente')">Cliente</router-link> |
-    <router-link to="/tecnico" @click.native="checkRole('tecnico')">Tecnico</router-link>
-  </nav>
-  <router-view/>
+  <v-app>
+    <v-app-bar app>
+      <v-toolbar-title>HomeTekDoc</v-toolbar-title>
+      <v-spacer></v-spacer>
+      <v-btn text to="/">Home</v-btn>
+      <v-btn text to="/about">About</v-btn>
+      <v-btn text to="/utenti" :disabled="!canAccess('admin')">Utenti</v-btn>
+      <v-btn text to="/cliente" :disabled="!canAccess('cliente')">Cliente</v-btn>
+      <v-btn text to="/tecnico" :disabled="!canAccess('tecnico')">Tecnico</v-btn>
+      <v-btn text to="/chat">Chat</v-btn>
+      <v-spacer></v-spacer>
+      <v-btn text to="/login">Login</v-btn>
+      <v-btn text to="/register">Register</v-btn>
+    </v-app-bar>
+    <v-main>
+      <router-view @route-change="updateUserRole"/>
+    </v-main>
+  </v-app>
 </template>
 
 <script>
 export default {
+  data() {
+    return {
+      userRole: localStorage.getItem('role')
+    }
+  },
   methods: {
-    checkRole(role) {
-      const userRole = localStorage.getItem('role');
-      if (userRole !== role) {
-        alert('Accesso negato');
-        event.preventDefault();
-      }
+    canAccess(role) {
+      return this.userRole === role;
+    },
+    updateUserRole() {
+      this.userRole = localStorage.getItem('role');
+    }
+  },
+  watch: {
+    '$route'() {
+      this.updateUserRole();
     }
   }
 }
 </script>
 
 <style>
-#app {
-  font-family: Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
 
 nav a {
   font-weight: bold;
