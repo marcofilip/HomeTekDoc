@@ -137,41 +137,40 @@ export default {
 
       this.loading = true;
       try {
-        const response = await fetch('http://65.109.163.183:3000/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(this.registerData)
-        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://65.109.163.183:3000/auth/register', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Registration failed');
-        }
-
-        this.showSnackbarMessage('Registration successful! Please login.', 'success');
-
-        // Reset form
-        this.$refs.form.reset();
-        this.registerData = {
-          username: '',
-          password: '',
-          nome: '',
-          email: '',
-          citta: '',
-          role: '', // Reset role
-          indirizzo: '' // Reset indirizzo
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status === 200) {
+              this.showSnackbarMessage('Registration successful! Please login.', 'success');
+              this.$refs.form.reset();
+              this.registerData = {
+                username: '',
+                password: '',
+                nome: '',
+                email: '',
+                citta: '',
+                role: '',
+                indirizzo: ''
+              };
+              this.confirmPassword = '';
+              setTimeout(() => {
+                this.$router.push('/login');
+              }, 2000);
+            } else {
+              this.showSnackbarMessage(data.error || 'Registration failed', 'error');
+            }
+            this.loading = false;
+          }
         };
-        this.confirmPassword = '';
 
-        // Redirect to login after a short delay
-        setTimeout(() => {
-          this.$router.push('/login');
-        }, 2000);
+        xhr.send(JSON.stringify(this.registerData));
       } catch (error) {
         this.showSnackbarMessage(error.message, 'error');
-      } finally {
         this.loading = false;
       }
     },

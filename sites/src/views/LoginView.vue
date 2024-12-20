@@ -72,38 +72,35 @@ export default {
 
       this.loading = true;
       try {
-        const response = await fetch('http://65.109.163.183:3000/auth/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify(this.loginData)
-        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://65.109.163.183:3000/auth/login', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
 
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error);
-        }
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status === 200) {
+              localStorage.setItem('role', data.user.role);
+              this.showSnackbarMessage('Login successful!', 'success');
+              setTimeout(() => {
+                const redirect = {
+                  admin: '/utenti',
+                  tecnico: '/tecnico',
+                  cliente: '/cliente'
+                }[data.user.role] || '/';
+                this.$router.push(redirect);
+              }, 1000);
+            } else {
+              this.showSnackbarMessage(data.error, 'error');
+            }
+            this.loading = false;
+          }
+        };
 
-        localStorage.setItem('role', data.user.role); // Store role in localStorage
-
-        this.showSnackbarMessage('Login successful!', 'success');
-        
-        setTimeout(() => {
-          const redirect = {
-            admin: '/utenti',
-            tecnico: '/tecnico',
-            cliente: '/cliente'
-          }[data.user.role] || '/';
-          
-          this.$router.push(redirect);
-        }, 1000);
-
+        xhr.send(JSON.stringify(this.loginData));
       } catch (error) {
         this.showSnackbarMessage(error.message, 'error');
-      } finally {
         this.loading = false;
       }
     },

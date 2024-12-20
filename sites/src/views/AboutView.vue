@@ -33,13 +33,13 @@ export default {
     showPlaceholder(type) {
       switch (type) {
         case 'chi':
-          this.placeholderText = 'Siamo persone';
+          this.placeholderText = 'Siamo...';
           break;
         case 'perche':
-          this.placeholderText = 'Boh';
+          this.placeholderText = 'Ci ha inspirato...';
           break;
         case 'dove':
-          this.placeholderText = 'Siamo qui.';
+          this.placeholderText = 'Ci troviamo...';
           break;
         default:
           this.placeholderText = '';
