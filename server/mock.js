@@ -24,9 +24,9 @@ mockDb.run(`CREATE TABLE IF NOT EXISTS auth_users (
     } else {
         console.log('auth_users table in mock database is ready');
         const mockUsers = [
-            ['testuser1', 'password1', 'Test User 1', 'test1@example.com', 'TestCity1', 'TestAddress1', 'cliente'],
-            ['testuser2', 'password2', 'Test User 2', 'test2@example.com', 'TestCity2', 'TestAddress2', 'tecnico'],
-            ['testuser3', 'password3', 'Test User 3', 'test3@example.com', 'TestCity3', 'TestAddress3', 'admin']
+            ['MarioX', 'mario123', 'Mario', 'mario@gmail.com', 'Mariona', 'Via Marini 4', 'cliente'],
+            ['LuigiY', 'luigi123', 'Luigi', 'luigi@hotmail.com', 'Luigioni', 'Via Luigino 5', 'tecnico'],
+            ['GiorgioZ', 'giorgio123', 'Giorgio', 'giorgio@yahoo.it', 'Giorgione', 'Via Giorgino 6', 'admin']
         ];
         mockUsers.forEach(user => {
             mockDb.run(`INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role) 
