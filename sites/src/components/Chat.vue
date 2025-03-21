@@ -18,7 +18,7 @@
 import { io } from 'socket.io-client';
 
 export default {
-  name: 'Chat',
+  name: 'ChatVue',
   data() {
     return {
       socket: null,

@@ -12,7 +12,7 @@ const port = 3000;
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "http://65.109.163.183:8080",
+        origin: "http://localhost:8080",
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
 });
 
 app.use(cors({
-    origin: 'http://65.109.163.183:8080',
+    origin: 'http://localhost:8080',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']

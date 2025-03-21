@@ -3,15 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "concurrently \"npm run sites\" \"npm run server\"",
-    "sites": "vue-cli-service serve",
-    "server": "cd .. && cd server && node server.js",
+    "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "@mdi/font": "^7.4.47",
+    "axios": "^1.7.7",
     "core-js": "^3.8.3",
-    "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "vue": "^3.2.13",
     "vue-router": "^4.0.3",
