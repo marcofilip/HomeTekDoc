@@ -81,7 +81,6 @@ export default {
           if (xhr.readyState === XMLHttpRequest.DONE) {
             const data = JSON.parse(xhr.responseText);
             if (xhr.status === 200) {
-              localStorage.setItem('role', data.user.role);
               this.showSnackbarMessage('Login successful!', 'success');
               setTimeout(() => {
                 const redirect = {

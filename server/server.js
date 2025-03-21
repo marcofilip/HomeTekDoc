@@ -147,8 +147,9 @@ app.post('/auth/register', (req, res) => {
     });
 });
 
+// server/server.js
+
 app.post('/auth/login', (req, res) => {
-    console.log('Login attempt:', req.body);
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -166,20 +167,15 @@ app.post('/auth/login', (req, res) => {
                 console.log('Invalid login attempt');
                 return res.status(401).json({ error: 'Invalid username or password' });
             }
-            console.log('User found:', user);
 
+            // Set session data
             req.session.user = {
                 username: user.username,
                 isAdmin: user.role === 'admin',
                 role: user.role
             };
 
-            res.cookie('user_role', user.role, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                maxAge: 24 * 60 * 60 * 1000
-            });
-
+            // Optionally, send the role back as a JSON payload for easier debugging
             res.json({
                 message: 'Login successful',
                 user: {
@@ -336,5 +332,5 @@ process.on('SIGINT', () => {
 });
 
 http.listen(port, '0.0.0.0', () => {
-    console.log(`Server running at http://65.109.163.183:${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });
