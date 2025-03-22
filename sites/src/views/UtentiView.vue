@@ -106,7 +106,7 @@ export default {
 
     async loadUsers() {
       try {
-        const response = await fetch('http://65.109.163.183:3000/utenti', {
+        const response = await fetch('http://localhost:3000/utenti', {
           credentials: 'include'
         });
         if (!response.ok) throw new Error('Errore nel caricamento degli utenti')
@@ -131,7 +131,7 @@ export default {
       if (!this.$refs.form.validate()) return
 
       try {
-        const response = await fetch('http://65.109.163.183:3000/utenti', {
+        const response = await fetch('http://localhost:3000/utenti', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -167,7 +167,7 @@ export default {
     async deleteUser() {
       try {
         console.log('Deleting user with ID:', this.userToDelete); // Debugging
-        const response = await fetch(`http://65.109.163.183:3000/utenti/${this.userToDelete}`, {
+        const response = await fetch(`http://localhost:3000/utenti/${this.userToDelete}`, {
           method: 'DELETE',
           credentials: 'include'
         });

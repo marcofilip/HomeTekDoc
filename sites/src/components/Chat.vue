@@ -29,7 +29,7 @@ export default {
     };
   },
   mounted() {
-    this.socket = io('http://65.109.163.183:3000');
+    this.socket = io('http://localhost:3000');
     
     this.socket.on('chat message', (msg) => {
       this.messages.push(msg);

@@ -73,7 +73,7 @@ export default {
       this.loading = true;
       try {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://65.109.163.183:3000/auth/login', true);
+        xhr.open('POST', 'http://localhost:3000/auth/login', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.withCredentials = true;
 
