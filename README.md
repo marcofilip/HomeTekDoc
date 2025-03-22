@@ -1,5 +1,37 @@
 # HomeTekDoc: Assistenza elettronica domiciliare veloce.
 
+## Requisiti del Progetto
+
+1. **Database (Mock e Real)**  
+   - Utente  
+   - Ruoli  
+   - Profili  
+
+2. **Autenticazione**  
+   - Sessione  
+   - Login  
+   - Logout  
+   - Google Auth  
+
+3. **Frontend (Vue o HBS)**  
+   - Admin backend  
+   - User frontend  
+
+4. **AJAX**  
+   - Chiamata API/backend/query SQL  
+   - Lista completa  
+   - Lista filtrata  
+
+5. **Web API di Terze Parti**  
+   - Configurazione ambienti `.env`  
+
+6. **Integrazione Swagger**
+
+7. **Integrazione Web Socket**  
+   - Minimo: contatore presenze visitatori in tempo reale (RT)
+
+## Descrizione del Progetto
+
 Sei stanco di dover portare i tuoi dispositivi elettronici in riparazione? La nostra piattaforma offre un'assistenza rapida e professionale a domicilio,
 grazie a una rete di tecnici specializzati e indipendenti esperti in riparazioni elettroniche. Risolvi i problemi della tua tecnologia senza dover lasciare casa:
 le nostre riparazioni sono rapide, efficaci e a portata di click. Non perdere più tempo e denaro in lunghe attese e trasferimenti: scegli la nostra soluzione innovativa
