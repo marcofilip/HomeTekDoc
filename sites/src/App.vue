@@ -16,6 +16,9 @@
       <v-btn text v-else @click="logout">Logout</v-btn>
       <v-btn text v-if="!isAuthenticated" to="/register">Register</v-btn>
     </v-app-bar>
+    <v-main>
+      <router-view></router-view>
+    </v-main>
   </v-app>
 </template>
 
