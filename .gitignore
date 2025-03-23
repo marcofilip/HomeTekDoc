@@ -1,3 +1,4 @@
 .env
+sites/.env
 node_modules
 sites/node_modules

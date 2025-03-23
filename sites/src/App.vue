@@ -26,6 +26,8 @@
 import axios from 'axios'; // Import Axios
 
 export default {
+  components: {
+  },
   data() {
     return {
       userRole: null, // Initially null, fetched from the server
@@ -68,7 +70,7 @@ export default {
         console.error("Logout error:", error);
         // Handle logout error (e.g., show a message to the user)
       }
-    }
+    },
   },
   watch: {
     '$route'() {
