@@ -10,6 +10,10 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const port = 3000;
 const http = require("http").createServer(app);
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.VUE_APP_GOOGLE_CLIENT_ID);
+// Import technician database module
+const tecnicoDb = require("./tecnicoDb");
 
 const io = require("socket.io")(http, {
   cors: {
@@ -216,6 +220,51 @@ app.post("/auth/login", (req, res) => {
   );
 });
 
+app.post('/auth/google', async (req, res) => {
+  const { token } = req.body;
+  
+  try {
+    // Verify the token
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.VUE_APP_GOOGLE_CLIENT_ID
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, picture } = payload;
+    
+    // Find or create user in your database
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = new User({
+        email,
+        name,
+        profilePicture: picture,
+        role: 'user' // Default role, adjust as needed
+      });
+      await user.save();
+    }
+    
+    // Set session or create JWT for your app
+    req.session.userId = user._id;
+    
+    res.json({ 
+      authenticated: true, 
+      user: {
+        email,
+        name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Error verifying Google token:', error);
+    res.status(401).json({ 
+      authenticated: false,
+      error: 'Invalid token' 
+    });
+  }
+});
+
 app.get("/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -336,6 +385,100 @@ app.get("/utenti/citta/:city", (req, res) => {
       return res.status(500).json({ error: err.message });
     }
     res.json({ utenti: rows });
+  });
+});
+
+// API endpoints for technicians
+app.post("/tecnici", auth, (req, res) => {
+  const technicianData = req.body;
+  
+  if (!technicianData.auth_user_id || !technicianData.specializzazione) {
+    return res.status(400).json({ error: "auth_user_id and specializzazione are required" });
+  }
+
+  tecnicoDb.createTechnician(technicianData, (err, technicianId) => {
+    if (err) {
+      console.error("Error creating technician:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(201).json({ 
+      message: "Tecnico creato con successo", 
+      id: technicianId 
+    });
+  });
+});
+
+app.get("/tecnici", (req, res) => {
+  tecnicoDb.getAllTechnicians((err, technicians) => {
+    if (err) {
+      console.error("Error retrieving technicians:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ tecnici: technicians });
+  });
+});
+
+app.get("/tecnici/specializzazione/:spec", (req, res) => {
+  const specializzazione = req.params.spec;
+  
+  tecnicoDb.getTechniciansBySpecialization(specializzazione, (err, technicians) => {
+    if (err) {
+      console.error("Error retrieving technicians by specialization:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ tecnici: technicians });
+  });
+});
+
+app.get("/tecnici/:id", (req, res) => {
+  const id = req.params.id;
+  
+  tecnicoDb.getTechnicianById(id, (err, technician) => {
+    if (err) {
+      console.error("Error retrieving technician:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (!technician) {
+      return res.status(404).json({ error: "Tecnico non trovato" });
+    }
+    
+    res.json({ tecnico: technician });
+  });
+});
+
+app.put("/tecnici/:id", auth, (req, res) => {
+  const id = req.params.id;
+  const technicianData = req.body;
+  
+  tecnicoDb.updateTechnician(id, technicianData, (err, changes) => {
+    if (err) {
+      console.error("Error updating technician:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (changes === 0) {
+      return res.status(404).json({ error: "Tecnico non trovato" });
+    }
+    
+    res.json({ message: "Tecnico aggiornato con successo" });
+  });
+});
+
+app.delete("/tecnici/:id", auth, (req, res) => {
+  const id = req.params.id;
+  
+  tecnicoDb.deleteTechnician(id, (err, changes) => {
+    if (err) {
+      console.error("Error deleting technician:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (changes === 0) {
+      return res.status(404).json({ error: "Tecnico non trovato" });
+    }
+    
+    res.json({ message: "Tecnico eliminato con successo" });
   });
 });
 

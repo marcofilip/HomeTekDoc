@@ -25,3 +25,9 @@ const app = createApp(App);
 app.use(router);
 app.use(vuetify);
 app.mount("#app");
+
+const script = document.createElement('script');
+script.src = "https://accounts.google.com/gsi/client";
+script.async = true;
+script.defer = true;
+document.head.appendChild(script);
