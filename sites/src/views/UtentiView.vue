@@ -71,8 +71,9 @@
                   :search="techSearch"
                   :loading="loadingTechnicians"
                   class="elevation-1"
-                >
-                  <template v-slot:item.actions="{ item }">
+                > 
+                <!--eslint-disable-next-line--> 
+                  <template #item.actions="{ item }">
                     <v-icon small class="mr-2" @click="editTechnician(item)">
                       mdi-pencil
                     </v-icon>
@@ -80,8 +81,10 @@
                       mdi-delete
                     </v-icon>
                   </template>
-                  <template v-slot:no-data>
-                    <v-alert type="info" class="ma-0">Nessun tecnico trovato</v-alert>
+                  <template #no-data>
+                    <v-alert type="info" class="ma-0">
+                      Nessun tecnico trovato
+                    </v-alert>
                   </template>
                 </v-data-table>
               </v-card-text>
@@ -129,9 +132,10 @@
       </v-card>
     </v-dialog>
   </v-container>
+
   <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
     {{ snackbar.text }}
-    <template v-slot:action="{ attrs }">
+    <template #action="{ attrs }">
       <v-btn text v-bind="attrs" @click="snackbar.show = false">
         Chiudi
       </v-btn>
@@ -216,11 +220,11 @@ export default {
         const response = await fetch('http://localhost:3000/tecnici', {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error('Errore nel caricamento dei tecnici');
         }
-        
+
         const data = await response.json();
         this.technicians = data.tecnici;
       } catch (error) {

@@ -177,7 +177,6 @@ app.post("/auth/register", (req, res) => {
 });
 
 // server/server.js
-
 app.post("/auth/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -202,6 +201,7 @@ app.post("/auth/login", (req, res) => {
 
       // Set session data
       req.session.user = {
+        id: user.id, // <-- Added user ID to session
         username: user.username,
         isAdmin: user.role === "admin",
         role: user.role,
@@ -220,11 +220,11 @@ app.post("/auth/login", (req, res) => {
   );
 });
 
-app.post('/auth/google', async (req, res) => {
+app.post("/auth/google", async (req, res) => {
   const { token } = req.body;
   
   try {
-    // Verify the token
+    // Verifica il token tramite Google API
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.VUE_APP_GOOGLE_CLIENT_ID
@@ -233,31 +233,59 @@ app.post('/auth/google', async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, picture } = payload;
     
-    // Find or create user in your database
-    let user = await User.findOne({ email });
-    if (!user) {
-      user = new User({
-        email,
-        name,
-        profilePicture: picture,
-        role: 'user' // Default role, adjust as needed
-      });
-      await user.save();
-    }
-    
-    // Set session or create JWT for your app
-    req.session.userId = user._id;
-    
-    res.json({ 
-      authenticated: true, 
-      user: {
-        email,
-        name,
-        role: user.role
+    // Cerca l'utente nel database sqlite
+    const selectQuery = `SELECT * FROM auth_users WHERE email = ?`;
+    db.get(selectQuery, [email], (err, userRow) => {
+      if (err) {
+        console.error("Error querying database:", err);
+        return res.status(500).json({ authenticated: false, error: err.message });
+      }
+      
+      if (userRow) {
+        // Utente già esistente
+        req.session.user = {
+          id: userRow.id,
+          username: userRow.username,
+          role: userRow.role
+        };
+        return res.json({
+          authenticated: true,
+          user: {
+            email: userRow.email,
+            name: userRow.nome,
+            role: userRow.role
+          }
+        });
+      } else {
+        // Crea un nuovo utente con dati di default
+        // Usiamo l'email come username e una password di default
+        const insertQuery = `
+          INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role)
+          VALUES (?, 'google_account', ?, ?, '', '', 'cliente')
+        `;
+        db.run(insertQuery, [email, name, email], function (err) {
+          if (err) {
+            console.error("Error inserting new user:", err);
+            return res.status(500).json({ authenticated: false, error: err.message });
+          }
+          req.session.user = {
+            id: this.lastID,
+            username: email,
+            role: 'cliente'
+          };
+          return res.json({
+            authenticated: true,
+            user: {
+              email: email,
+              name: name,
+              role: 'cliente'
+            }
+          });
+        });
       }
     });
   } catch (error) {
-    console.error('Error verifying Google token:', error);
+    console.error("Error verifying Google token:", error);
     res.status(401).json({ 
       authenticated: false,
       error: 'Invalid token' 
@@ -391,12 +419,14 @@ app.get("/utenti/citta/:city", (req, res) => {
 // API endpoints for technicians
 app.post("/tecnici", auth, (req, res) => {
   const technicianData = req.body;
-  
-  if (!technicianData.auth_user_id || !technicianData.specializzazione) {
-    return res.status(400).json({ error: "auth_user_id and specializzazione are required" });
+  // Get auth_user_id from session
+  const auth_user_id = req.session.user.id; 
+
+  if (!technicianData.specializzazione) {
+    return res.status(400).json({ error: "specializzazione is required" });
   }
 
-  tecnicoDb.createTechnician(technicianData, (err, technicianId) => {
+  tecnicoDb.createTechnician({ ...technicianData, auth_user_id: auth_user_id }, (err, technicianId) => {
     if (err) {
       console.error("Error creating technician:", err);
       return res.status(500).json({ error: err.message });
@@ -450,8 +480,10 @@ app.get("/tecnici/:id", (req, res) => {
 app.put("/tecnici/:id", auth, (req, res) => {
   const id = req.params.id;
   const technicianData = req.body;
-  
-  tecnicoDb.updateTechnician(id, technicianData, (err, changes) => {
+  // Get auth_user_id from session
+  const auth_user_id = req.session.user.id; 
+
+  tecnicoDb.updateTechnician(id, { ...technicianData, auth_user_id: auth_user_id }, (err, changes) => {
     if (err) {
       console.error("Error updating technician:", err);
       return res.status(500).json({ error: err.message });

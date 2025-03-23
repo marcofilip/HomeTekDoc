@@ -38,6 +38,43 @@ mockDb.run(`CREATE TABLE IF NOT EXISTS auth_users (
                 }
             });
         });
+
+        // Creazione della tabella technicians nella mock database
+        mockDb.run(`CREATE TABLE IF NOT EXISTS technicians (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            auth_user_id INTEGER,
+            specializzazione TEXT NOT NULL,
+            esperienza_anni INTEGER,
+            tariffa_oraria REAL,
+            disponibilita TEXT,
+            note TEXT,
+            latitudine REAL,
+            longitudine REAL,
+            FOREIGN KEY (auth_user_id) REFERENCES auth_users(id) ON DELETE CASCADE
+        )`, (err) => {
+            if (err) {
+                console.error('Error creating technicians table in mock database:', err);
+            } else {
+                console.log('technicians table in mock database is ready');
+
+                // Inserimento di dati di esempio per i tecnici
+                // Assumiamo che l'utente "LuigiY" (role tecnico) abbia id=2 nella tabella auth_users
+                const mockTechnicians = [
+                    [2, 'Idraulico', 5, 30.5, 'Lun-Ven 8-18', 'Esperto in impianti idraulici', 45.4642, 9.1900],
+                    // Aggiungi eventualmente altri record di esempio...
+                ];
+                mockTechnicians.forEach(tech => {
+                    mockDb.run(`INSERT INTO technicians (auth_user_id, specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, latitudine, longitudine)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, tech, (err) => {
+                        if (err) {
+                            console.error('Error inserting mock technician:', err);
+                        } else {
+                            console.log('Mock technician inserted successfully');
+                        }
+                    });
+                });
+            }
+        });
     }
 });
 

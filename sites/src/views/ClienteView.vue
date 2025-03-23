@@ -1,7 +1,7 @@
 <template>
   <v-container>
     <h1 class="text-h3 text-center mb-6">Benvenuto Cliente</h1>
-    
+
     <v-card class="mb-6">
       <v-card-title>
         Trova un Tecnico
@@ -16,8 +16,11 @@
           @input="filterTechnicians"
         ></v-text-field>
       </v-card-title>
-      
+
       <v-card-text>
+        <!-- Componente Mappa -->
+        <technician-map :technicians="filteredTechnicians" class="mb-4"></technician-map>
+
         <v-row>
           <v-col cols="12" sm="6" md="4" v-for="tech in filteredTechnicians" :key="tech.id" class="pa-2">
             <v-card elevation="2" class="h-100">
@@ -41,7 +44,7 @@
             </v-card>
           </v-col>
         </v-row>
-        
+
         <v-alert v-if="filteredTechnicians.length === 0" type="info" text class="mt-4">
           Nessun tecnico trovato con questa specializzazione.
         </v-alert>
@@ -51,8 +54,13 @@
 </template>
 
 <script>
+import TechnicianMap from '@/components/TechnicianMap.vue';
+
 export default {
   name: 'ClienteView',
+  components: {
+    TechnicianMap
+  },
   data() {
     return {
       technicians: [],
@@ -69,18 +77,23 @@ export default {
     async fetchTechnicians() {
       this.loading = true;
       this.error = null;
-      
+
       try {
         const response = await fetch('http://localhost:3000/tecnici', {
           credentials: 'include'
         });
-        
+
         if (!response.ok) {
           throw new Error('Errore nel caricamento dei tecnici');
         }
-        
+
         const data = await response.json();
-        this.technicians = data.tecnici;
+        // Assicurati che i dati dei tecnici includano latitudine e longitudine
+        this.technicians = data.tecnici.map(tech => ({
+          ...tech,
+          latitudine: parseFloat(tech.latitudine) || null,
+          longitudine: parseFloat(tech.longitudine) || null
+        }));
         this.filteredTechnicians = this.technicians;
       } catch (error) {
         console.error('Error fetching technicians:', error);
@@ -89,13 +102,13 @@ export default {
         this.loading = false;
       }
     },
-    
+
     filterTechnicians() {
       if (!this.search) {
         this.filteredTechnicians = this.technicians;
         return;
       }
-      
+
       const searchTerm = this.search.toLowerCase();
       this.filteredTechnicians = this.technicians.filter(tech => {
         return tech.specializzazione.toLowerCase().includes(searchTerm);
