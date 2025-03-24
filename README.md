@@ -1,35 +1,5 @@
 # HomeTekDoc: Assistenza Elettronica Domiciliare Veloce
 
-## Requisiti del Progetto
-
-1. **Database (Mock e Real)**  
-   - Utente  
-   - Ruoli  
-   - Profili  
-
-2. **Autenticazione**  
-   - Sessione  
-   - Login  
-   - Logout  
-   - Google Auth  
-
-3. **Frontend (Vue o HBS)**  
-   - Admin backend  
-   - User frontend  
-
-4. **AJAX**  
-   - Chiamata API/backend/query SQL  
-   - Lista completa  
-   - Lista filtrata  
-
-5. **Web API di Terze Parti**  
-   - Configurazione ambienti `.env`  
-
-6. **Integrazione Swagger**
-
-7. **Integrazione Web Socket**  
-   - Minimo: contatore presenze visitatori in tempo reale (RT)
-
 ## Descrizione del Progetto
 
 HomeTekDoc è una piattaforma che mette in contatto consumatori privati con tecnici specializzati per riparazioni elettroniche a domicilio. L'applicazione offre:
@@ -195,6 +165,36 @@ I consumatori hanno bisogno di un modo rapido, affidabile e trasparente per riso
 * **Rapidità:** Risolvere i problemi tecnici in tempi brevi.
 * **Efficienza:** Ottimizzare il processo di assistenza per la massima soddisfazione del cliente.
 
+## Requisiti del Progetto
+
+1. **Database (Mock e Real)**  
+   - Utente  
+   - Ruoli  
+   - Profili  
+
+2. **Autenticazione**  
+   - Sessione  
+   - Login  
+   - Logout  
+   - Google Auth  
+
+3. **Frontend (Vue o HBS)**  
+   - Admin backend  
+   - User frontend  
+
+4. **AJAX**  
+   - Chiamata API/backend/query SQL  
+   - Lista completa  
+   - Lista filtrata  
+
+5. **Web API di Terze Parti**  
+   - Configurazione ambienti `.env`  
+
+6. **Integrazione Swagger**
+
+7. **Integrazione Web Socket**  
+   - Minimo: contatore presenze visitatori in tempo reale (RT)
+
 ## Struttura dei File
 
 - **server/**  
@@ -229,7 +229,7 @@ Lo script **run-docker.ps1** (in radice) controlla se Docker è installato, lo s
 
 ## Come Far Girare l'Applicazione
 
-2. Apri un terminale PowerShell con privilegi amministrativi e naviga nella cartella radice del progetto (ad esempio, `d:\squola\tep\HomeTekDoc`).
+2. Apri un terminale PowerShell con privilegi amministrativi e naviga nella cartella radice del progetto (ad esempio, `C:\HomeTekDoc`).
 
 3. Esegui lo script:
    ```powershell
@@ -238,10 +238,3 @@ Lo script **run-docker.ps1** (in radice) controlla se Docker è installato, lo s
 
    - Se Docker non è installato, lo script lo scaricherà ed installerà Docker Desktop.
    - Una volta installato, riavvia lo script per avviare i container.
-
-4. Il backend sarà disponibile all'indirizzo: [http://localhost:3000](http://localhost:3000)  
-   Il frontend sarà disponibile all'indirizzo: [http://localhost:8080](http://localhost:8080)
-
-## Conclusioni
-
-Utilizzando Docker e docker-compose vengono creati due container separati per il backend e il frontend, garantendo uno sviluppo isolato e una distribuzione semplificata dell'intera applicazione.
