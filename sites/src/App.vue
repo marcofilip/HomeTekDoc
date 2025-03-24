@@ -7,6 +7,8 @@
       <v-spacer></v-spacer>
       <v-btn text to="/">Home</v-btn>
       <v-btn text to="/about">About</v-btn>
+      <!-- Bottone per FAQ -->
+      <v-btn text to="/faq">FAQ</v-btn>
       <v-btn text to="/utenti" :disabled="!isAuthenticated || !canAccess('admin')">Utenti</v-btn>
       <v-btn text to="/cliente" :disabled="!isAuthenticated || !canAccess('cliente')">Cliente</v-btn>
       <v-btn text to="/tecnico" :disabled="!isAuthenticated || !canAccess('tecnico')">Tecnico</v-btn>

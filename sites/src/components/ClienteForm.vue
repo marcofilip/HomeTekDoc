@@ -1,11 +1,6 @@
 <template>
   <v-container>
     <v-form>
-      <v-text-field 
-        v-model="telefono"
-        label="Telefono"
-        required
-      ></v-text-field>
       <v-textarea
         v-model="note"
         label="Note (opzionali)"
@@ -20,29 +15,22 @@ export default {
   props: {
     modelValue: {
       type: Object,
-      default: () => ({ telefono: '', note: '' })
+      default: () => ({ note: '' })
     }
   },
   data() {
     return {
-      telefono: this.modelValue.telefono,
       note: this.modelValue.note
     }
   },
   watch: {
-    telefono(newVal) {
-      this.emitUpdate();
-    },
-    note(newVal) {
+    note() {
       this.emitUpdate();
     }
   },
   methods: {
     emitUpdate() {
-      this.$emit('update:modelValue', {
-        telefono: this.telefono,
-        note: this.note
-      });
+      this.$emit('update:modelValue', { note: this.note });
     }
   },
   created() {

@@ -13,7 +13,6 @@
         <v-tabs-items v-model="activeTab">
           <!-- Users Tab -->
           <v-tab-item>
-            <!-- Users List -->
             <v-card>
               <v-card-title>Lista Utenti</v-card-title>
               <v-card-text>
@@ -37,6 +36,9 @@
                       </v-list-item-subtitle>
                     </v-list-item-content>
                     <v-list-item-action>
+                      <v-btn icon color="primary" @click="openEditDialog(user)">
+                        <v-icon>mdi-pencil</v-icon>
+                      </v-btn>
                       <v-btn icon color="error" @click="confirmDelete(user.id)">
                         <v-icon>mdi-delete</v-icon>
                       </v-btn>
@@ -50,31 +52,15 @@
             </v-card>
           </v-tab-item>
 
-          <!-- Technicians Tab -->
+          <!-- Technicians Tab: simile, con possibilità di modificare i dati specifici -->
           <v-tab-item>
             <v-card>
-              <v-card-title>
-                Lista Tecnici
-                <v-spacer></v-spacer>
-                <v-text-field
-                  v-model="techSearch"
-                  append-icon="mdi-magnify"
-                  label="Cerca per specializzazione"
-                  single-line
-                  hide-details
-                ></v-text-field>
-              </v-card-title>
+              <v-card-title>Lista Tecnici</v-card-title>
               <v-card-text>
-                <v-data-table
-                  :headers="techHeaders"
-                  :items="technicians"
-                  :search="techSearch"
-                  :loading="loadingTechnicians"
-                  class="elevation-1"
-                > 
-                <!--eslint-disable-next-line--> 
-                  <template #item.actions="{ item }">
-                    <v-icon small class="mr-2" @click="editTechnician(item)">
+                <v-data-table :headers="techHeaders" :items="technicians" :loading="loadingTechnicians"
+                  class="elevation-1">
+                  <template #[`item.actions`]="{ item }">
+                    <v-icon small class="mr-2" @click="openEditTechnicianDialog(item)">
                       mdi-pencil
                     </v-icon>
                     <v-icon small @click="confirmDeleteTechnician(item.id)">
@@ -131,6 +117,32 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Edit User Dialog -->
+    <v-dialog v-model="editDialog" max-width="400">
+      <v-card>
+        <v-card-title>
+          Modifica Utente
+        </v-card-title>
+        <v-card-text>
+          <v-form ref="editForm" v-model="valid">
+            <v-text-field v-model="editUserData.nome" label="Nome"
+              :rules="[v => !!v || 'Nome richiesto']"></v-text-field>
+            <v-text-field v-model="editUserData.email" label="Email"
+              :rules="[v => !!v || 'Email richiesta']"></v-text-field>
+            <v-text-field v-model="editUserData.citta" label="Città"
+              :rules="[v => !!v || 'Città richiesta']"></v-text-field>
+            <v-text-field v-model="editUserData.indirizzo" label="Indirizzo"
+              :rules="[v => !!v || 'Indirizzo richiesto']"></v-text-field>
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text @click="editDialog = false">Annulla</v-btn>
+          <v-btn color="primary" text @click="updateUser">Salva</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 
   <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
@@ -176,7 +188,10 @@ export default {
         { text: 'Azioni', value: 'actions', sortable: false }
       ],
       deleteTechDialog: false,
-      technicianToDelete: null
+      technicianToDelete: null,
+      editDialog: false,
+      editUserData: {},
+      valid: false,
     }
   },
   mounted() {
@@ -319,6 +334,45 @@ export default {
         console.error('Delete technician error:', error);
         this.showSnackbar('Errore nell\'eliminazione del tecnico', 'error');
       }
+    },
+
+    openEditDialog(user) {
+      // Copia i dati dell'utente selezionato in editUserData
+      this.editUserData = { ...user };
+      this.editDialog = true;
+    },
+
+    async updateUser() {
+      if (!this.$refs.editForm.validate()) return;
+      try {
+        const response = await fetch(`http://localhost:3000/utenti/${this.editUserData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            nome: this.editUserData.nome,
+            email: this.editUserData.email,
+            citta: this.editUserData.citta,
+            indirizzo: this.editUserData.indirizzo,
+          })
+        });
+        if (response.ok) {
+          this.showSnackbar('Utente aggiornato con successo', 'success');
+          this.editDialog = false;
+          await this.loadUsers();
+        } else {
+          const data = await response.json();
+          this.showSnackbar(data.error || 'Errore nell\'aggiornamento', 'error');
+        }
+      } catch (error) {
+        console.error('Update user error:', error);
+        this.showSnackbar('Errore nell\'aggiornamento', 'error');
+      }
+    },
+
+    openEditTechnicianDialog(tech) {
+      // Analogamente, implementa la modifica per i tecnici (eventualmente aprendo un dialog con campi specifici)
+      console.log("Modifica tecnico:", tech);
     }
   }
 }

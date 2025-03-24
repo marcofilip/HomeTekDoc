@@ -17,6 +17,7 @@ mockDb.run(`CREATE TABLE IF NOT EXISTS auth_users (
     email TEXT NOT NULL,
     citta TEXT NOT NULL,
     indirizzo TEXT NOT NULL,
+    telefono TEXT NOT NULL,
     role TEXT CHECK(role IN ('cliente', 'tecnico', 'admin')) NOT NULL
 )`, (err) => {
     if (err) {
@@ -24,13 +25,13 @@ mockDb.run(`CREATE TABLE IF NOT EXISTS auth_users (
     } else {
         console.log('auth_users table in mock database is ready');
         const mockUsers = [
-            ['MarioX', 'mario123', 'Mario', 'mario@gmail.com', 'Mariona', 'Via Marini 4', 'cliente'],
-            ['LuigiY', 'luigi123', 'Luigi', 'luigi@hotmail.com', 'Luigioni', 'Via Luigino 5', 'tecnico'],
-            ['GiorgioZ', 'giorgio123', 'Giorgio', 'giorgio@yahoo.it', 'Giorgione', 'Via Giorgino 6', 'admin']
+            ['MarioX', 'mario123', 'Mario', 'mario@gmail.com', 'Mariona', 'Via Marini 4', '1234567890', 'cliente'],
+            ['LuigiY', 'luigi123', 'Luigi', 'luigi@hotmail.com', 'Luigioni', 'Via Luigino 5', '0987654321', 'tecnico'],
+            ['GiorgioZ', 'giorgio123', 'Giorgio', 'giorgio@yahoo.it', 'Giorgione', 'Via Giorgino 6', '1122334455', 'admin']
         ];
         mockUsers.forEach(user => {
-            mockDb.run(`INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?)`, user, (err) => {
+            mockDb.run(`INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, telefono, role) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, user, (err) => {
                 if (err) {
                     console.error('Error inserting mock user:', err);
                 } else {

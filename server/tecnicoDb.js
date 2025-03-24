@@ -19,13 +19,15 @@ let db = new sqlite3.Database(dbPath, (err) => {
     `CREATE TABLE IF NOT EXISTS technicians (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       auth_user_id INTEGER,
-      specializzazione TEXT NOT NULL,
-      esperienza_anni INTEGER,
-      tariffa_oraria REAL,
-      disponibilita TEXT,
-      note TEXT,
-      latitudine REAL,  -- Added latitude column
-      longitudine REAL, -- Added longitude column
+      specializzazione TEXT NOT NULL CHECK(length(specializzazione) <= 250),
+      esperienza_anni INTEGER CHECK(esperienza_anni >= 0 AND esperienza_anni < 50),
+      tariffa_oraria REAL CHECK(tariffa_oraria >= 0 AND tariffa_oraria < 1000000),
+      disponibilita TEXT CHECK(length(disponibilita) <= 250),
+      note TEXT CHECK(length(note) <= 500),
+      certificazioni TEXT,            -- Nuovo campo opzionale
+      foto TEXT,                      -- Nuovo campo opzionale: URL o percorso della foto
+      latitudine REAL,                -- verrà impostato dal geocoder
+      longitudine REAL,               -- verrà impostato dal geocoder
       FOREIGN KEY (auth_user_id) REFERENCES auth_users(id) ON DELETE CASCADE
     )`,
     (err) => {
@@ -38,38 +40,23 @@ let db = new sqlite3.Database(dbPath, (err) => {
   );
 });
 
-// Helper function to get the full address of the user
-function getindirizzoUtente(auth_user_id, callback) {
-  const query = `
-    SELECT citta, indirizzo FROM auth_users WHERE id = ?
-  `;
-  db.get(query, [auth_user_id], (err, row) => {
-    if (err) {
-      return callback(err);
-    }
-    if (!row) {
-      return callback(new Error("Utente non trovato"));
-    }
+// Modify getindirizzoUtente to accept a dbConnection:
+const getindirizzoUtente = (dbConnection, auth_user_id, callback) => {
+  const query = `SELECT citta, indirizzo FROM auth_users WHERE id = ?`;
+  dbConnection.get(query, [auth_user_id], (err, row) => {
+    if (err) return callback(err);
+    if (!row) return callback(new Error("Utente non trovato"));
     const indirizzoCompleto = `${row.indirizzo}, ${row.citta}`;
     callback(null, indirizzoCompleto);
   });
-}
+};
 
-// Create a new technician profile
-const createTechnician = (technicianData, callback) => {
-  const {
-    auth_user_id,
-    specializzazione,
-    esperienza_anni,
-    tariffa_oraria,
-    disponibilita,
-    note
-  } = technicianData;
+// Update createTechnician to accept the db connection as first argument:
+const createTechnician = (dbConnection, technicianData, callback) => {
+  const { auth_user_id, specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note } = technicianData;
 
-  getindirizzoUtente(auth_user_id, (err, indirizzoCompleto) => {
-    if (err) {
-      return callback(err);
-    }
+  getindirizzoUtente(dbConnection, auth_user_id, (err, indirizzoCompleto) => {
+    if (err) return callback(err);
 
     geocoder.geocode(indirizzoCompleto)
       .then(res => {
@@ -79,22 +66,16 @@ const createTechnician = (technicianData, callback) => {
           latitudine = res[0].latitude;
           longitudine = res[0].longitude;
         } else {
-          console.warn(`Geocoding fallito per indirizzo: ${indirizzoCompleto}`);
+          console.warn("Geocoding fallito per indirizzo:", indirizzoCompleto);
         }
-
         const query = `
-          INSERT INTO technicians
-          (auth_user_id, specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, latitudine, longitudine)
+          INSERT INTO technicians 
+            (auth_user_id, specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, latitudine, longitudine)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `;
-
-        db.run(
-          query,
-          [auth_user_id, specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, latitudine, longitudine],
-          function(err) {
-            callback(err, this.lastID);
-          }
-        );
+        dbConnection.run(query, [auth_user_id, specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, latitudine, longitudine], function(err) {
+          callback(err, this.lastID);
+        });
       })
       .catch(err => {
         console.error("Errore geocoding:", err);
@@ -195,11 +176,58 @@ const deleteTechnician = (id, callback) => {
   });
 };
 
+const getTechniciansAdvanced = (filters, callback) => {
+  // Costruzione dinamica della query e degli array di parametri
+  let baseQuery = `
+    SELECT t.*, u.nome, u.email, u.citta, u.indirizzo,
+           (6371 * acos( cos( radians(?) ) * cos( radians(t.latitudine) ) *
+           cos( radians(t.longitudine) - radians(?)) + sin(radians(?)) *
+           sin(radians(t.latitudine)) )) AS distance,
+           IFNULL((
+             SELECT AVG(rating) FROM feedback WHERE technician_id = t.id
+           ), 0) AS avg_rating
+    FROM technicians t
+    JOIN auth_users u ON t.auth_user_id = u.id
+  `;
+  const params = [Number(filters.client_lat), Number(filters.client_lng), Number(filters.client_lat)];
+  let whereClauses = [];
+  
+  if (filters.specializzazione) {
+    whereClauses.push("t.specializzazione LIKE ?");
+    params.push(`%${filters.specializzazione}%`);
+  }
+  if (filters.disponibilita) {
+    whereClauses.push("t.disponibilita LIKE ?");
+    params.push(`%${filters.disponibilita}%`);
+  }
+  
+  if (whereClauses.length > 0) {
+    baseQuery += " WHERE " + whereClauses.join(" AND ");
+  }
+  
+  baseQuery += " GROUP BY t.id";
+  
+  if (filters.min_rating) {
+    baseQuery += " HAVING avg_rating >= ?";
+    params.push(Number(filters.min_rating));
+  }
+  if (filters.max_distance) {
+    // Se si usa HAVING per il filtro distanza
+    baseQuery += filters.min_rating ? " AND" : " HAVING";
+    baseQuery += " distance <= ?";
+    params.push(Number(filters.max_distance));
+  }
+  
+  // Esegui la query:
+  db.all(baseQuery, params, callback);
+};
+
 module.exports = {
   createTechnician,
   getAllTechnicians,
   getTechniciansBySpecialization,
   getTechnicianById,
   updateTechnician,
-  deleteTechnician
+  deleteTechnician,
+  getTechniciansAdvanced
 };

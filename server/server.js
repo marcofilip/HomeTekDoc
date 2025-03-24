@@ -14,7 +14,7 @@ const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.VUE_APP_GOOGLE_CLIENT_ID);
 // Import technician database module
 const tecnicoDb = require("./tecnicoDb");
-
+const feedbackRouter = require("./feedback");
 const io = require("socket.io")(http, {
   cors: {
     origin: "http://localhost:8080",
@@ -106,8 +106,9 @@ db.run(
     email TEXT NOT NULL,
     citta TEXT NOT NULL,
     indirizzo TEXT NOT NULL,
+    telefono TEXT NOT NULL,
     role TEXT CHECK(role IN ('cliente', 'tecnico', 'admin')) NOT NULL
-)`,
+  )`,
   (err) => {
     if (err) {
       console.error("Error creating auth_users table:", err);
@@ -121,8 +122,8 @@ db.run(
             console.error("Error checking admin user:", err);
           } else if (!row) {
             db.run(
-              `INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role) 
-                       VALUES ('admin', 'GreatestAdmin3v3r', 'Admin', 'admin@gmail.com', 'AdminLandia', 'Administrator', 'admin')`,
+              `INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, telefono, role) 
+                       VALUES ('admin', 'GreatestAdmin3v3r', 'Admin', 'admin@gmail.com', 'AdminLandia', 'Administrator', '0000000000', 'admin')`,
               (err) => {
                 if (err) {
                   console.error("Error creating admin user:", err);
@@ -138,42 +139,102 @@ db.run(
   }
 );
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS assistenza (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    description TEXT,
+    urgente INTEGER DEFAULT 0, -- 0: non urgente, 1: urgente
+    status TEXT DEFAULT 'in attesa',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES auth_users(id) ON DELETE CASCADE
+  )
+`, (err) => {
+  if (err) {
+    console.error("Error creating assistenza table:", err);
+  } else {
+    console.log("Assistenza table is ready");
+  }
+});
+
 app.post("/auth/register", (req, res) => {
   console.log("Received registration request:", req.body);
-  const { username, password, nome, email, citta, indirizzo, role } = req.body;
+  const { username, password, nome, email, citta, indirizzo, role, telefono } = req.body;
+  // Eventuali dati extra per il profilo tecnico, ad es. specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note
+  const tecnicoExtra = req.body.tecnicoData || {}; 
 
-  if (
-    !username ||
-    !password ||
-    !nome ||
-    !email ||
-    !citta ||
-    !indirizzo ||
-    !role
-  ) {
+  if (!username || !password || !nome || !email || !citta || !indirizzo || !role || !telefono) {
     return res.status(400).json({ error: "All fields are required" });
   }
 
-  const query = `
-        INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
+  // Avvio della transazione
+  db.run("BEGIN TRANSACTION", (err) => {
+    if (err) {
+      console.error("Error beginning transaction:", err);
+      return res.status(500).json({ error: err.message });
+    }
 
-  db.run(
-    query,
-    [username, password, nome, email, citta, indirizzo, role],
-    function (err) {
+    const query = `
+      INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, telefono, role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    db.run(query, [username, password, nome, email, citta, indirizzo, telefono, role], function (err) {
       if (err) {
         console.error("Registration error:", err);
+        db.run("ROLLBACK");
         if (err.message.includes("UNIQUE constraint failed")) {
           return res.status(400).json({ error: "Username already exists" });
         }
         return res.status(500).json({ error: err.message });
       }
-      console.log("User registered successfully");
-      res.json({ message: "User registered successfully" });
-    }
-  );
+
+      const userId = this.lastID;
+      console.log("User registered successfully with ID:", userId);
+
+      // Se il ruolo è tecnico, procediamo a creare il profilo tecnico
+      if (role === "tecnico") {
+        const technicianData = {
+          auth_user_id: userId,
+          specializzazione: tecnicoExtra.specializzazione || "",
+          esperienza_anni: tecnicoExtra.esperienza_anni || 0,
+          tariffa_oraria: tecnicoExtra.tariffa_oraria || 0,
+          disponibilita: tecnicoExtra.disponibilita || "",
+          note: tecnicoExtra.note || "",
+          certificazioni: tecnicoExtra.certificazioni || "",
+          foto: tecnicoExtra.foto || ""
+        };
+
+        // Pass the same `db` connection to technician creation
+        tecnicoDb.createTechnician(db, technicianData, (err, technicianId) => {
+          if (err) {
+            console.error("Error creating technician:", err);
+            db.run("ROLLBACK");
+            return res.status(500).json({ error: err.message });
+          }
+          db.run("COMMIT", (err) => {
+            if (err) {
+              console.error("Error committing transaction:", err);
+              return res.status(500).json({ error: err.message });
+            }
+            res.json({
+              message: "Registrazione effettuata con successo",
+              userId: userId,
+              technicianId: technicianId
+            });
+          });
+        });
+      } else {
+        // For non-tecnico roles, commit the transaction and send response
+        db.run("COMMIT", (err) => {
+          if (err) {
+            console.error("Error committing transaction:", err);
+            return res.status(500).json({ error: err.message });
+          }
+          res.json({ message: "Registrazione avvenuta con successo", userId: userId });
+        });
+      }
+    });
+  });
 });
 
 // server/server.js
@@ -371,19 +432,60 @@ app.get("/utenti/filtrati", (req, res) => {
 app.put("/utenti/:id", (req, res) => {
   const { id } = req.params;
   const { nome, email, citta, indirizzo } = req.body;
-  db.run(
-    `UPDATE auth_users SET nome = ?, email = ?, citta = ?, indirizzo = ? WHERE id = ?`,
-    [nome, email, citta, indirizzo, id],
-    function (err) {
+  const now = Date.now();
+
+  // Prima, recuperiamo i campi di controllo per le modifiche
+  db.get("SELECT mod_count, mod_reset FROM auth_users WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ error: `Utente ${id} non trovato` });
+    }
+
+    // Se non ancora presenti, consideriamo mod_count=0 e mod_reset null
+    let mod_count = row.mod_count || 0;
+    let mod_reset = row.mod_reset; // memorizzato come timestamp
+
+    // Se mod_reset esiste e il countdown è ancora attivo
+    if (mod_reset && now < mod_reset && mod_count === 2) {
+      return res.status(403).json({ error: "Hai raggiunto il limite di 2 modifiche. Riprova dopo 24 ore." });
+    }
+
+    // Se il countdown è scaduto, resettiamo il contatore
+    if (mod_reset && now >= mod_reset) {
+      mod_count = 0;
+      mod_reset = null;
+    }
+
+    // Determiniamo i nuovi valori in base alla modifica corrente
+    let new_mod_count, new_mod_reset;
+    if (mod_count === 0) {
+      new_mod_count = 1;
+      new_mod_reset = now + 24 * 60 * 60 * 1000; // 24 ore in ms
+    } else if (mod_count === 1) {
+      new_mod_count = 2;
+      new_mod_reset = mod_reset || now + 24 * 60 * 60 * 1000;
+    } else {
+      return res.status(403).json({ error: "Non puoi modificare attualmente." });
+    }
+
+    // Eseguiamo l'update includendo i nuovi valori di mod_count e mod_reset
+    const updateQuery = `
+      UPDATE auth_users 
+      SET nome = ?, email = ?, citta = ?, indirizzo = ?, mod_count = ?, mod_reset = ?
+      WHERE id = ?
+    `;
+    db.run(updateQuery, [nome, email, citta, indirizzo, new_mod_count, new_mod_reset, id], function (err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
       if (this.changes === 0) {
-        return res.status(404).json({ message: `Utente ${id} non trovato` });
+        return res.status(404).json({ error: `Utente ${id} non trovato` });
       }
-      res.json({ message: `Utente ${id} modificato` });
-    }
-  );
+      res.json({ message: `Utente ${id} modificato con successo`, mod_count: new_mod_count, mod_reset: new_mod_reset });
+    });
+  });
 });
 
 app.delete("/utenti/:id", (req, res) => {
@@ -439,13 +541,33 @@ app.post("/tecnici", auth, (req, res) => {
 });
 
 app.get("/tecnici", (req, res) => {
-  tecnicoDb.getAllTechnicians((err, technicians) => {
-    if (err) {
-      console.error("Error retrieving technicians:", err);
-      return res.status(500).json({ error: err.message });
-    }
-    res.json({ tecnici: technicians });
-  });
+  // Se ci sono query parameters avanzati, usali altrimenti richiama getAllTechnicians
+  const filters = {
+    specializzazione: req.query.specializzazione,
+    disponibilita: req.query.disponibilita,
+    min_rating: req.query.min_rating,
+    max_distance: req.query.max_distance,
+    client_lat: req.query.client_lat || 41.9028, // default centrato sull'Italia
+    client_lng: req.query.client_lng || 12.4964
+  };
+
+  if (filters.specializzazione || filters.disponibilita || filters.min_rating || filters.max_distance) {
+    require("./tecnicoDb").getTechniciansAdvanced(filters, (err, technicians) => {
+      if (err) {
+        console.error("Error retrieving advanced technicians:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ tecnici: technicians });
+    });
+  } else {
+    require("./tecnicoDb").getAllTechnicians((err, technicians) => {
+      if (err) {
+        console.error("Error retrieving technicians:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ tecnici: technicians });
+    });
+  }
 });
 
 app.get("/tecnici/specializzazione/:spec", (req, res) => {
@@ -514,6 +636,36 @@ app.delete("/tecnici/:id", auth, (req, res) => {
   });
 });
 
+app.post("/assistenza", auth, (req, res) => {
+  const { description, urgente } = req.body;
+  const customer_id = req.session.user.id;
+
+  if (!description) {
+    return res.status(400).json({ error: "La descrizione è obbligatoria" });
+  }
+
+  const query = `
+    INSERT INTO assistenza (customer_id, description, urgente)
+    VALUES (?, ?, ?)
+  `;
+
+  // urgente deve essere 1 se true, altrimenti 0
+  const urgFlag = urgente ? 1 : 0;
+  db.run(query, [customer_id, description, urgFlag], function(err) {
+    if (err) {
+      console.error("Error inserting assistenza request:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    // Se la richiesta è urgente, puoi eventualmente attivare un meccanismo di notifica
+    res.json({
+      message: "Richiesta di assistenza inviata con successo",
+      richiestaId: this.lastID,
+      urgente: urgFlag
+    });
+  });
+});
+
+app.use("/", feedbackRouter);
 app.use("/api", exampleRouter);
 
 app.get("/test", (req, res) => {
