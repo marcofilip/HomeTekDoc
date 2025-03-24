@@ -165,6 +165,10 @@ I consumatori hanno bisogno di un modo rapido, affidabile e trasparente per riso
 * **Rapidità:** Risolvere i problemi tecnici in tempi brevi.
 * **Efficienza:** Ottimizzare il processo di assistenza per la massima soddisfazione del cliente.
 
+## YUML
+
+![Diagramma YUML](https://github.com/user-attachments/assets/51cf7cc7-855b-4912-9b7e-013f82913aeb)
+
 ## Requisiti del Progetto
 
 1. **Database (Mock e Real)**  
