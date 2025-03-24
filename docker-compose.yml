@@ -1,13 +1,16 @@
 version: "3.8"
 services:
   server:
-    build: ./server
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     ports:
       - "3000:3000"
     volumes:
       - ./server:/app
     environment:
       - NODE_ENV=development
+
   sites:
     build: ./sites
     ports:
