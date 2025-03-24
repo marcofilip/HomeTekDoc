@@ -1,4 +1,4 @@
-# HomeTekDoc: Assistenza elettronica domiciliare veloce.
+# HomeTekDoc: Assistenza Elettronica Domiciliare Veloce
 
 ## Requisiti del Progetto
 
@@ -31,6 +31,12 @@
    - Minimo: contatore presenze visitatori in tempo reale (RT)
 
 ## Descrizione del Progetto
+
+HomeTekDoc è una piattaforma che mette in contatto consumatori privati con tecnici specializzati per riparazioni elettroniche a domicilio. L'applicazione offre:
+- Registrazione e gestione degli account (clienti e tecnici)
+- Visualizzazione dei tecnici su mappa, con dettagli come specializzazione, esperienza, tariffa e disponibilità
+- Sistema di richiesta di assistenza, feedback e valutazioni
+- Integrazione con Swagger e WebSocket per feature in tempo reale
 
 Sei stanco di dover portare i tuoi dispositivi elettronici in riparazione? La nostra piattaforma offre un'assistenza rapida e professionale a domicilio,
 grazie a una rete di tecnici specializzati e indipendenti esperti in riparazioni elettroniche. Risolvi i problemi della tua tecnologia senza dover lasciare casa:
@@ -189,6 +195,53 @@ I consumatori hanno bisogno di un modo rapido, affidabile e trasparente per riso
 * **Rapidità:** Risolvere i problemi tecnici in tempi brevi.
 * **Efficienza:** Ottimizzare il processo di assistenza per la massima soddisfazione del cliente.
 
-## yUML
+## Struttura dei File
 
-![1](https://github.com/user-attachments/assets/51cf7cc7-855b-4912-9b7e-013f82913aeb)
+- **server/**  
+  - Contiene il backend Node.js.  
+  - [Dockerfile](server/Dockerfile): Definisce l'immagine Docker per il backend.  
+  - [server.js](server/server.js): Punto di ingresso del server.  
+  - [tecnicoDb.js](server/tecnicoDb.js): Modulo per le operazioni CRUD sui tecnici.  
+  - [mock.js](server/mock.js): Database mock e popolamento delle tabelle.
+
+- **sites/**  
+  - Contiene il frontend sviluppato in Vue.js.  
+  - [Dockerfile](sites/Dockerfile): Definisce l'immagine Docker per il frontend.  
+  - [UtentiView.vue](sites/src/views/UtentiView.vue) e [ClienteView.vue](sites/src/views/ClienteView.vue): Componenti di visualizzazione.
+
+- **docker-compose.yml**  
+  - File in radice che definisce i servizi per il backend (server) e il frontend (sites).
+
+- **run-docker.ps1**  
+  - Script PowerShell in radice che controlla se Docker è installato, lo scarica ed esegue i container.
+
+## Esecuzione con Docker
+
+Lo svolgimento dell'applicazione in Docker avviene tramite due container separati (Node.js per il backend e Vue.js per il frontend).
+
+### Prerequisiti
+- Windows (lo script è in PowerShell)
+- Permessi di amministratore per installare Docker Desktop, se non già presente
+
+## Script di Avvio (run-docker.ps1)
+
+Lo script **run-docker.ps1** (in radice) controlla se Docker è installato, lo scarica ed esegue il comando per avviare i container.
+
+## Come Far Girare l'Applicazione
+
+2. Apri un terminale PowerShell con privilegi amministrativi e naviga nella cartella radice del progetto (ad esempio, `d:\squola\tep\HomeTekDoc`).
+
+3. Esegui lo script:
+   ```powershell
+   .\run-docker.ps1
+   ```
+
+   - Se Docker non è installato, lo script lo scaricherà ed installerà Docker Desktop.
+   - Una volta installato, riavvia lo script per avviare i container.
+
+4. Il backend sarà disponibile all'indirizzo: [http://localhost:3000](http://localhost:3000)  
+   Il frontend sarà disponibile all'indirizzo: [http://localhost:8080](http://localhost:8080)
+
+## Conclusioni
+
+Utilizzando Docker e docker-compose vengono creati due container separati per il backend e il frontend, garantendo uno sviluppo isolato e una distribuzione semplificata dell'intera applicazione.
