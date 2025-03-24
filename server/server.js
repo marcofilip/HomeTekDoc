@@ -159,9 +159,11 @@ db.run(`
 
 app.post("/auth/register", (req, res) => {
   console.log("Received registration request:", req.body);
-  const { username, password, nome, email, citta, indirizzo, role, telefono } = req.body;
-  // Eventuali dati extra per il profilo tecnico, ad es. specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note
-  const tecnicoExtra = req.body.tecnicoData || {}; 
+  const { 
+    username, password, nome, email, citta, indirizzo, role, telefono,
+    // Ottieni i dati tecnici direttamente dal req.body
+    specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, certificazioni, foto 
+  } = req.body;
 
   if (!username || !password || !nome || !email || !citta || !indirizzo || !role || !telefono) {
     return res.status(400).json({ error: "All fields are required" });
@@ -195,13 +197,13 @@ app.post("/auth/register", (req, res) => {
       if (role === "tecnico") {
         const technicianData = {
           auth_user_id: userId,
-          specializzazione: tecnicoExtra.specializzazione || "",
-          esperienza_anni: tecnicoExtra.esperienza_anni || 0,
-          tariffa_oraria: tecnicoExtra.tariffa_oraria || 0,
-          disponibilita: tecnicoExtra.disponibilita || "",
-          note: tecnicoExtra.note || "",
-          certificazioni: tecnicoExtra.certificazioni || "",
-          foto: tecnicoExtra.foto || ""
+          specializzazione: specializzazione || "",
+          esperienza_anni: esperienza_anni || 0,
+          tariffa_oraria: tariffa_oraria || 0,
+          disponibilita: disponibilita || "",
+          note: note || "",
+          certificazioni: certificazioni || "",
+          foto: foto || ""
         };
 
         // Pass the same `db` connection to technician creation
