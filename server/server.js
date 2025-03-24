@@ -10,7 +10,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const port = 3000;
 const http = require("http").createServer(app);
-const { OAuth2Client } = require('google-auth-library');
+const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.VUE_APP_GOOGLE_CLIENT_ID);
 // Import technician database module
 const tecnicoDb = require("./tecnicoDb");
@@ -83,19 +83,18 @@ const auth = (req, res, next) => {
 };
 
 // Uncomment the following line to use the actual database
-const dbPath = path.join(__dirname, "database.db");
+// const dbPath = path.join(__dirname, "database.db");
 
 // Uncomment the following lines to use the mock database
-// const dbPath = path.join(__dirname, 'mock.db');
-// const db = require('./mock');
+const dbPath = path.join(__dirname, 'mock.db');
+const db = require('./mock');
 
 // Comment the following block if using the mock database module
-console.log("Database path:", dbPath);
-
-let db = new sqlite3.Database(dbPath, (err) => {
-  if (err) return console.error("Database connection error:", err.message);
-  console.log("Connected to SQLite database at:", dbPath);
-});
+// console.log("Database path:", dbPath);
+// let db = new sqlite3.Database(dbPath, (err) => {
+//   if (err) return console.error("Database connection error:", err.message);
+//   console.log("Connected to SQLite database at:", dbPath);
+// });
 
 db.run(
   `CREATE TABLE IF NOT EXISTS auth_users (
@@ -139,7 +138,8 @@ db.run(
   }
 );
 
-db.run(`
+db.run(
+  `
   CREATE TABLE IF NOT EXISTS assistenza (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id INTEGER NOT NULL,
@@ -149,23 +149,47 @@ db.run(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES auth_users(id) ON DELETE CASCADE
   )
-`, (err) => {
-  if (err) {
-    console.error("Error creating assistenza table:", err);
-  } else {
-    console.log("Assistenza table is ready");
+`,
+  (err) => {
+    if (err) {
+      console.error("Error creating assistenza table:", err);
+    } else {
+      console.log("Assistenza table is ready");
+    }
   }
-});
+);
 
 app.post("/auth/register", (req, res) => {
   console.log("Received registration request:", req.body);
-  const { 
-    username, password, nome, email, citta, indirizzo, role, telefono,
+  const {
+    username,
+    password,
+    nome,
+    email,
+    citta,
+    indirizzo,
+    role,
+    telefono,
     // Ottieni i dati tecnici direttamente dal req.body
-    specializzazione, esperienza_anni, tariffa_oraria, disponibilita, note, certificazioni, foto 
+    specializzazione,
+    esperienza_anni,
+    tariffa_oraria,
+    disponibilita,
+    note,
+    certificazioni,
+    foto,
   } = req.body;
 
-  if (!username || !password || !nome || !email || !citta || !indirizzo || !role || !telefono) {
+  if (
+    !username ||
+    !password ||
+    !nome ||
+    !email ||
+    !citta ||
+    !indirizzo ||
+    !role ||
+    !telefono
+  ) {
     return res.status(400).json({ error: "All fields are required" });
   }
 
@@ -180,62 +204,73 @@ app.post("/auth/register", (req, res) => {
       INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, telefono, role)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    db.run(query, [username, password, nome, email, citta, indirizzo, telefono, role], function (err) {
-      if (err) {
-        console.error("Registration error:", err);
-        db.run("ROLLBACK");
-        if (err.message.includes("UNIQUE constraint failed")) {
-          return res.status(400).json({ error: "Username already exists" });
-        }
-        return res.status(500).json({ error: err.message });
-      }
-
-      const userId = this.lastID;
-      console.log("User registered successfully with ID:", userId);
-
-      // Se il ruolo è tecnico, procediamo a creare il profilo tecnico
-      if (role === "tecnico") {
-        const technicianData = {
-          auth_user_id: userId,
-          specializzazione: specializzazione || "",
-          esperienza_anni: esperienza_anni || 0,
-          tariffa_oraria: tariffa_oraria || 0,
-          disponibilita: disponibilita || "",
-          note: note || "",
-          certificazioni: certificazioni || "",
-          foto: foto || ""
-        };
-
-        // Pass the same `db` connection to technician creation
-        tecnicoDb.createTechnician(db, technicianData, (err, technicianId) => {
-          if (err) {
-            console.error("Error creating technician:", err);
-            db.run("ROLLBACK");
-            return res.status(500).json({ error: err.message });
+    db.run(
+      query,
+      [username, password, nome, email, citta, indirizzo, telefono, role],
+      function (err) {
+        if (err) {
+          console.error("Registration error:", err);
+          db.run("ROLLBACK");
+          if (err.message.includes("UNIQUE constraint failed")) {
+            return res.status(400).json({ error: "Username already exists" });
           }
+          return res.status(500).json({ error: err.message });
+        }
+
+        const userId = this.lastID;
+        console.log("User registered successfully with ID:", userId);
+
+        // Se il ruolo è tecnico, procediamo a creare il profilo tecnico
+        if (role === "tecnico") {
+          const technicianData = {
+            auth_user_id: userId,
+            specializzazione: specializzazione || "",
+            esperienza_anni: esperienza_anni || 0,
+            tariffa_oraria: tariffa_oraria || 0,
+            disponibilita: disponibilita || "",
+            note: note || "",
+            certificazioni: certificazioni || "",
+            foto: foto || "",
+          };
+
+          // Pass the same `db` connection to technician creation
+          tecnicoDb.createTechnician(
+            db,
+            technicianData,
+            (err, technicianId) => {
+              if (err) {
+                console.error("Error creating technician:", err);
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: err.message });
+              }
+              db.run("COMMIT", (err) => {
+                if (err) {
+                  console.error("Error committing transaction:", err);
+                  return res.status(500).json({ error: err.message });
+                }
+                res.json({
+                  message: "Registrazione effettuata con successo",
+                  userId: userId,
+                  technicianId: technicianId,
+                });
+              });
+            }
+          );
+        } else {
+          // For non-tecnico roles, commit the transaction and send response
           db.run("COMMIT", (err) => {
             if (err) {
               console.error("Error committing transaction:", err);
               return res.status(500).json({ error: err.message });
             }
             res.json({
-              message: "Registrazione effettuata con successo",
+              message: "Registrazione avvenuta con successo",
               userId: userId,
-              technicianId: technicianId
             });
           });
-        });
-      } else {
-        // For non-tecnico roles, commit the transaction and send response
-        db.run("COMMIT", (err) => {
-          if (err) {
-            console.error("Error committing transaction:", err);
-            return res.status(500).json({ error: err.message });
-          }
-          res.json({ message: "Registrazione avvenuta con successo", userId: userId });
-        });
+        }
       }
-    });
+    );
   });
 });
 
@@ -285,39 +320,41 @@ app.post("/auth/login", (req, res) => {
 
 app.post("/auth/google", async (req, res) => {
   const { token } = req.body;
-  
+
   try {
     // Verifica il token tramite Google API
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.VUE_APP_GOOGLE_CLIENT_ID
+      audience: process.env.VUE_APP_GOOGLE_CLIENT_ID,
     });
-    
+
     const payload = ticket.getPayload();
     const { email, name, picture } = payload;
-    
+
     // Cerca l'utente nel database sqlite
     const selectQuery = `SELECT * FROM auth_users WHERE email = ?`;
     db.get(selectQuery, [email], (err, userRow) => {
       if (err) {
         console.error("Error querying database:", err);
-        return res.status(500).json({ authenticated: false, error: err.message });
+        return res
+          .status(500)
+          .json({ authenticated: false, error: err.message });
       }
-      
+
       if (userRow) {
         // Utente già esistente
         req.session.user = {
           id: userRow.id,
           username: userRow.username,
-          role: userRow.role
+          role: userRow.role,
         };
         return res.json({
           authenticated: true,
           user: {
             email: userRow.email,
             name: userRow.nome,
-            role: userRow.role
-          }
+            role: userRow.role,
+          },
         });
       } else {
         // Crea un nuovo utente con dati di default
@@ -329,29 +366,31 @@ app.post("/auth/google", async (req, res) => {
         db.run(insertQuery, [email, name, email], function (err) {
           if (err) {
             console.error("Error inserting new user:", err);
-            return res.status(500).json({ authenticated: false, error: err.message });
+            return res
+              .status(500)
+              .json({ authenticated: false, error: err.message });
           }
           req.session.user = {
             id: this.lastID,
             username: email,
-            role: 'cliente'
+            role: "cliente",
           };
           return res.json({
             authenticated: true,
             user: {
               email: email,
               name: name,
-              role: 'cliente'
-            }
+              role: "cliente",
+            },
           });
         });
       }
     });
   } catch (error) {
     console.error("Error verifying Google token:", error);
-    res.status(401).json({ 
+    res.status(401).json({
       authenticated: false,
-      error: 'Invalid token' 
+      error: "Invalid token",
     });
   }
 });
@@ -377,6 +416,26 @@ app.get("/auth/check", (req, res) => {
       authenticated: false,
     });
   }
+});
+
+// Add user profile endpoint
+app.get("/auth/profile", auth, (req, res) => {
+  if (!req.session.user || !req.session.user.id) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  
+  db.get("SELECT id, nome, email, citta, indirizzo, telefono, role FROM auth_users WHERE id = ?", 
+    [req.session.user.id], 
+    (err, user) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({ user });
+    }
+  );
 });
 
 app.post("/utenti", (req, res) => {
@@ -437,57 +496,73 @@ app.put("/utenti/:id", (req, res) => {
   const now = Date.now();
 
   // Prima, recuperiamo i campi di controllo per le modifiche
-  db.get("SELECT mod_count, mod_reset FROM auth_users WHERE id = ?", [id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
-    if (!row) {
-      return res.status(404).json({ error: `Utente ${id} non trovato` });
-    }
+  db.get(
+    "SELECT mod_count, mod_reset FROM auth_users WHERE id = ?",
+    [id],
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (!row) {
+        return res.status(404).json({ error: `Utente ${id} non trovato` });
+      }
 
-    // Se non ancora presenti, consideriamo mod_count=0 e mod_reset null
-    let mod_count = row.mod_count || 0;
-    let mod_reset = row.mod_reset; // memorizzato come timestamp
+      // Se non ancora presenti, consideriamo mod_count=0 e mod_reset null
+      let mod_count = row.mod_count || 0;
+      let mod_reset = row.mod_reset; // memorizzato come timestamp
 
-    // Se mod_reset esiste e il countdown è ancora attivo
-    if (mod_reset && now < mod_reset && mod_count === 2) {
-      return res.status(403).json({ error: "Hai raggiunto il limite di 2 modifiche. Riprova dopo 24 ore." });
-    }
+      // Se mod_reset esiste e il countdown è ancora attivo
+      if (mod_reset && now < mod_reset && mod_count === 2) {
+        return res.status(403).json({
+          error: "Hai raggiunto il limite di 2 modifiche. Riprova dopo 24 ore.",
+        });
+      }
 
-    // Se il countdown è scaduto, resettiamo il contatore
-    if (mod_reset && now >= mod_reset) {
-      mod_count = 0;
-      mod_reset = null;
-    }
+      // Se il countdown è scaduto, resettiamo il contatore
+      if (mod_reset && now >= mod_reset) {
+        mod_count = 0;
+        mod_reset = null;
+      }
 
-    // Determiniamo i nuovi valori in base alla modifica corrente
-    let new_mod_count, new_mod_reset;
-    if (mod_count === 0) {
-      new_mod_count = 1;
-      new_mod_reset = now + 24 * 60 * 60 * 1000; // 24 ore in ms
-    } else if (mod_count === 1) {
-      new_mod_count = 2;
-      new_mod_reset = mod_reset || now + 24 * 60 * 60 * 1000;
-    } else {
-      return res.status(403).json({ error: "Non puoi modificare attualmente." });
-    }
+      // Determiniamo i nuovi valori in base alla modifica corrente
+      let new_mod_count, new_mod_reset;
+      if (mod_count === 0) {
+        new_mod_count = 1;
+        new_mod_reset = now + 24 * 60 * 60 * 1000; // 24 ore in ms
+      } else if (mod_count === 1) {
+        new_mod_count = 2;
+        new_mod_reset = mod_reset || now + 24 * 60 * 60 * 1000;
+      } else {
+        return res
+          .status(403)
+          .json({ error: "Non puoi modificare attualmente." });
+      }
 
-    // Eseguiamo l'update includendo i nuovi valori di mod_count e mod_reset
-    const updateQuery = `
+      // Eseguiamo l'update includendo i nuovi valori di mod_count e mod_reset
+      const updateQuery = `
       UPDATE auth_users 
       SET nome = ?, email = ?, citta = ?, indirizzo = ?, mod_count = ?, mod_reset = ?
       WHERE id = ?
     `;
-    db.run(updateQuery, [nome, email, citta, indirizzo, new_mod_count, new_mod_reset, id], function (err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      if (this.changes === 0) {
-        return res.status(404).json({ error: `Utente ${id} non trovato` });
-      }
-      res.json({ message: `Utente ${id} modificato con successo`, mod_count: new_mod_count, mod_reset: new_mod_reset });
-    });
-  });
+      db.run(
+        updateQuery,
+        [nome, email, citta, indirizzo, new_mod_count, new_mod_reset, id],
+        function (err) {
+          if (err) {
+            return res.status(500).json({ error: err.message });
+          }
+          if (this.changes === 0) {
+            return res.status(404).json({ error: `Utente ${id} non trovato` });
+          }
+          res.json({
+            message: `Utente ${id} modificato con successo`,
+            mod_count: new_mod_count,
+            mod_reset: new_mod_reset,
+          });
+        }
+      );
+    }
+  );
 });
 
 app.delete("/utenti/:id", (req, res) => {
@@ -512,7 +587,7 @@ app.delete("/utenti/:id", (req, res) => {
 
 app.get("/utenti/citta/:city", (req, res) => {
   const citta = req.params.city;
-  db.all(`SELECT * FROM utenti WHERE citta = ?`, [citta], (err, rows) => {
+  db.all(`SELECT * FROM auth_users WHERE citta = ?`, [citta], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -523,80 +598,99 @@ app.get("/utenti/citta/:city", (req, res) => {
 // API endpoints for technicians
 app.post("/tecnici", auth, (req, res) => {
   const technicianData = req.body;
-  // Get auth_user_id from session
-  const auth_user_id = req.session.user.id; 
+  // Preleva l'id dell'utente dalla sessione
+  const auth_user_id = req.session.user.id;
 
   if (!technicianData.specializzazione) {
     return res.status(400).json({ error: "specializzazione is required" });
   }
 
-  tecnicoDb.createTechnician({ ...technicianData, auth_user_id: auth_user_id }, (err, technicianId) => {
-    if (err) {
-      console.error("Error creating technician:", err);
-      return res.status(500).json({ error: err.message });
+  // Passa db a createTechnician:
+  tecnicoDb.createTechnician(
+    db, // passaggio esplicito della connessione
+    { ...technicianData, auth_user_id: auth_user_id },
+    (err, technicianId) => {
+      if (err) {
+        console.error("Error creating technician:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.status(201).json({
+        message: "Tecnico creato con successo",
+        id: technicianId,
+      });
     }
-    res.status(201).json({ 
-      message: "Tecnico creato con successo", 
-      id: technicianId 
-    });
-  });
+  );
 });
 
 app.get("/tecnici", (req, res) => {
-  // Se ci sono query parameters avanzati, usali altrimenti richiama getAllTechnicians
+  // Prepara i filtri se presenti
   const filters = {
     specializzazione: req.query.specializzazione,
     disponibilita: req.query.disponibilita,
     min_rating: req.query.min_rating,
     max_distance: req.query.max_distance,
-    client_lat: req.query.client_lat || 41.9028, // default centrato sull'Italia
-    client_lng: req.query.client_lng || 12.4964
+    client_lat: req.query.client_lat || 41.9028,
+    client_lng: req.query.client_lng || 12.4964,
   };
 
-  if (filters.specializzazione || filters.disponibilita || filters.min_rating || filters.max_distance) {
-    require("./tecnicoDb").getTechniciansAdvanced(filters, (err, technicians) => {
-      if (err) {
-        console.error("Error retrieving advanced technicians:", err);
-        return res.status(500).json({ error: err.message });
-      }
-      res.json({ tecnici: technicians });
-    });
+  if (
+    filters.specializzazione ||
+    filters.disponibilita ||
+    filters.min_rating ||
+    filters.max_distance
+  ) {
+    // Usa getTechniciansAdvanced passando il db
+    tecnicoDb.getTechniciansAdvanced(
+      filters,
+      (err, technicians) => {
+        if (err) {
+          console.error("Error retrieving advanced technicians:", err);
+          return res.status(500).json({ error: err.message });
+        }
+        res.json({ tecnici: technicians });
+      },
+      db // passiamo qui il database (mockDb)
+    );
   } else {
-    require("./tecnicoDb").getAllTechnicians((err, technicians) => {
+    // Per la chiamata base, passa il db a getAllTechnicians:
+    tecnicoDb.getAllTechnicians((err, technicians) => {
       if (err) {
         console.error("Error retrieving technicians:", err);
         return res.status(500).json({ error: err.message });
       }
       res.json({ tecnici: technicians });
-    });
+    }, db); // <-- Passa l'oggetto db
   }
 });
 
 app.get("/tecnici/specializzazione/:spec", (req, res) => {
   const specializzazione = req.params.spec;
-  
-  tecnicoDb.getTechniciansBySpecialization(specializzazione, (err, technicians) => {
-    if (err) {
-      console.error("Error retrieving technicians by specialization:", err);
-      return res.status(500).json({ error: err.message });
+
+  tecnicoDb.getTechniciansBySpecialization(
+    specializzazione,
+    (err, technicians) => {
+      if (err) {
+        console.error("Error retrieving technicians by specialization:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ tecnici: technicians });
     }
-    res.json({ tecnici: technicians });
-  });
+  );
 });
 
 app.get("/tecnici/:id", (req, res) => {
   const id = req.params.id;
-  
+
   tecnicoDb.getTechnicianById(id, (err, technician) => {
     if (err) {
       console.error("Error retrieving technician:", err);
       return res.status(500).json({ error: err.message });
     }
-    
+
     if (!technician) {
       return res.status(404).json({ error: "Tecnico non trovato" });
     }
-    
+
     res.json({ tecnico: technician });
   });
 });
@@ -605,35 +699,39 @@ app.put("/tecnici/:id", auth, (req, res) => {
   const id = req.params.id;
   const technicianData = req.body;
   // Get auth_user_id from session
-  const auth_user_id = req.session.user.id; 
+  const auth_user_id = req.session.user.id;
 
-  tecnicoDb.updateTechnician(id, { ...technicianData, auth_user_id: auth_user_id }, (err, changes) => {
-    if (err) {
-      console.error("Error updating technician:", err);
-      return res.status(500).json({ error: err.message });
+  tecnicoDb.updateTechnician(
+    id,
+    { ...technicianData, auth_user_id: auth_user_id },
+    (err, changes) => {
+      if (err) {
+        console.error("Error updating technician:", err);
+        return res.status(500).json({ error: err.message });
+      }
+
+      if (changes === 0) {
+        return res.status(404).json({ error: "Tecnico non trovato" });
+      }
+
+      res.json({ message: "Tecnico aggiornato con successo" });
     }
-    
-    if (changes === 0) {
-      return res.status(404).json({ error: "Tecnico non trovato" });
-    }
-    
-    res.json({ message: "Tecnico aggiornato con successo" });
-  });
+  );
 });
 
 app.delete("/tecnici/:id", auth, (req, res) => {
   const id = req.params.id;
-  
+
   tecnicoDb.deleteTechnician(id, (err, changes) => {
     if (err) {
       console.error("Error deleting technician:", err);
       return res.status(500).json({ error: err.message });
     }
-    
+
     if (changes === 0) {
       return res.status(404).json({ error: "Tecnico non trovato" });
     }
-    
+
     res.json({ message: "Tecnico eliminato con successo" });
   });
 });
@@ -653,7 +751,7 @@ app.post("/assistenza", auth, (req, res) => {
 
   // urgente deve essere 1 se true, altrimenti 0
   const urgFlag = urgente ? 1 : 0;
-  db.run(query, [customer_id, description, urgFlag], function(err) {
+  db.run(query, [customer_id, description, urgFlag], function (err) {
     if (err) {
       console.error("Error inserting assistenza request:", err);
       return res.status(500).json({ error: err.message });
@@ -662,9 +760,33 @@ app.post("/assistenza", auth, (req, res) => {
     res.json({
       message: "Richiesta di assistenza inviata con successo",
       richiestaId: this.lastID,
-      urgente: urgFlag
+      urgente: urgFlag,
     });
   });
+});
+
+// Add geocoding endpoint
+app.get("/geocode", (req, res) => {
+  const address = req.query.address;
+  if (!address) {
+    return res.status(400).json({ error: "Address is required" });
+  }
+  
+  geocoder.geocode(address)
+    .then(results => {
+      if (results && results.length > 0) {
+        res.json({ 
+          lat: results[0].latitude, 
+          lng: results[0].longitude 
+        });
+      } else {
+        res.status(404).json({ error: "Address not found" });
+      }
+    })
+    .catch(err => {
+      console.error("Geocoding error:", err);
+      res.status(500).json({ error: "Geocoding failed" });
+    });
 });
 
 app.use("/", feedbackRouter);
@@ -677,12 +799,16 @@ app.get("/test", (req, res) => {
 swaggerSetup(app);
 
 process.on("SIGINT", () => {
-  db.close((err) => {
-    if (err) {
-      return console.error(err.message);
-    }
-    console.log("Closing the SQLite database.");
-  });
+  // db.close((err) => {
+  //   if (err) {
+  //     return console.error(err.message);
+  //   }
+  //   console.log("Closing the SQLite database.");
+  //   process.exit(0);
+  // });
+
+  // Uncomment the following block if using the mock database module
+
   mockDb.close((err) => {
     if (err) {
       return console.error(err.message);

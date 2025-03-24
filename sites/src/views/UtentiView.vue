@@ -5,44 +5,48 @@
         <h1 class="text-h3 text-center mb-6">Gestione Utenti</h1>
 
         <!-- Tabs for Users and Technicians -->
-        <v-tabs v-model="activeTab" centered class="mb-6">
+        <v-tabs v-model="activeTab" centered class="mb-6" @change="handleTabChange">
           <v-tab>Utenti</v-tab>
           <v-tab>Tecnici</v-tab>
         </v-tabs>
 
-        <v-tabs-items v-model="activeTab">
+        <v-window v-model="activeTab">
           <!-- Users Tab -->
-          <v-tab-item>
+          <v-window-item>
             <v-card>
               <v-card-title>Lista Utenti</v-card-title>
               <v-card-text>
                 <v-list v-if="users.length > 0">
                   <v-list-item v-for="user in users" :key="user.id">
-                    <v-list-item-content>
-                      <v-list-item-title class="font-weight-bold">
-                        {{ user.nome }}
-                      </v-list-item-title>
-                      <v-list-item-subtitle>
-                        Email: {{ user.email }}
-                      </v-list-item-subtitle>
-                      <v-list-item-subtitle>
-                        Città: {{ user.citta }}
-                      </v-list-item-subtitle>
-                      <v-list-item-subtitle>
-                        Ruolo: {{ user.role }}
-                      </v-list-item-subtitle>
-                      <v-list-item-subtitle>
-                        Indirizzo: {{ user.indirizzo }}
-                      </v-list-item-subtitle>
-                    </v-list-item-content>
-                    <v-list-item-action>
+                    <template v-slot:prepend>
+                      <v-avatar color="primary">
+                        <v-icon color="white">mdi-account</v-icon>
+                      </v-avatar>
+                    </template>
+                    <v-list-item-title class="font-weight-bold">
+                      {{ user.nome }}
+                    </v-list-item-title>
+                    <v-list-item-subtitle>
+                      Email: {{ user.email }}
+                    </v-list-item-subtitle>
+                    <v-list-item-subtitle>
+                      Città: {{ user.citta }}
+                    </v-list-item-subtitle>
+                    <v-list-item-subtitle>
+                      Ruolo: {{ user.role }}
+                    </v-list-item-subtitle>
+                    <v-list-item-subtitle>
+                      Indirizzo: {{ user.indirizzo }}
+                    </v-list-item-subtitle>
+                    
+                    <template v-slot:append>
                       <v-btn icon color="primary" @click="openEditDialog(user)">
                         <v-icon>mdi-pencil</v-icon>
                       </v-btn>
                       <v-btn icon color="error" @click="confirmDelete(user.id)">
                         <v-icon>mdi-delete</v-icon>
                       </v-btn>
-                    </v-list-item-action>
+                    </template>
                   </v-list-item>
                 </v-list>
                 <v-alert v-else type="info" text>
@@ -50,24 +54,28 @@
                 </v-alert>
               </v-card-text>
             </v-card>
-          </v-tab-item>
+          </v-window-item>
 
-          <!-- Technicians Tab: simile, con possibilità di modificare i dati specifici -->
-          <v-tab-item>
+          <!-- Technicians Tab -->
+          <v-window-item>
             <v-card>
               <v-card-title>Lista Tecnici</v-card-title>
               <v-card-text>
-                <v-data-table :headers="techHeaders" :items="technicians" :loading="loadingTechnicians"
-                  class="elevation-1">
-                  <template #[`item.actions`]="{ item }">
-                    <v-icon small class="mr-2" @click="openEditTechnicianDialog(item)">
-                      mdi-pencil
-                    </v-icon>
-                    <v-icon small @click="confirmDeleteTechnician(item.id)">
-                      mdi-delete
-                    </v-icon>
+                <v-data-table 
+                  :headers="techHeaders" 
+                  :items="technicians" 
+                  :loading="loadingTechnicians"
+                  class="elevation-1"
+                >
+                  <template v-slot:[`item.actions`]="{ item }">
+                    <v-btn icon color="primary" size="small" @click="editTechnician(item.raw)">
+                      <v-icon>mdi-pencil</v-icon>
+                    </v-btn>
+                    <v-btn icon color="error" size="small" @click="confirmDeleteTechnician(item.raw.id)">
+                      <v-icon>mdi-delete</v-icon>
+                    </v-btn>
                   </template>
-                  <template #no-data>
+                  <template v-slot:no-data>
                     <v-alert type="info" class="ma-0">
                       Nessun tecnico trovato
                     </v-alert>
@@ -75,8 +83,8 @@
                 </v-data-table>
               </v-card-text>
             </v-card>
-          </v-tab-item>
-        </v-tabs-items>
+          </v-window-item>
+        </v-window>
       </v-col>
     </v-row>
 
@@ -179,24 +187,26 @@ export default {
       techSearch: '',
       loadingTechnicians: false,
       techHeaders: [
-        { text: 'Nome', value: 'nome' },
-        { text: 'Specializzazione', value: 'specializzazione' },
-        { text: 'Esperienza (anni)', value: 'esperienza_anni' },
-        { text: 'Tariffa (€/h)', value: 'tariffa_oraria' },
-        { text: 'Email', value: 'email' },
-        { text: 'Città', value: 'citta' },
-        { text: 'Azioni', value: 'actions', sortable: false }
+        { title: 'Nome', key: 'nome' },
+        { title: 'Specializzazione', key: 'specializzazione' },
+        { title: 'Esperienza (anni)', key: 'esperienza_anni' },
+        { title: 'Tariffa (€/h)', key: 'tariffa_oraria' },
+        { title: 'Email', key: 'email' },
+        { title: 'Città', key: 'citta' },
+        { title: 'Azioni', key: 'actions', sortable: false }
       ],
       deleteTechDialog: false,
       technicianToDelete: null,
       editDialog: false,
       editUserData: {},
       valid: false,
+      clientUsers: [],
+      technicianUsers: [],
     }
   },
   mounted() {
     this.loadUsers();
-    this.loadTechnicians();
+    // Non caricare i tecnici qui, lo facciamo quando si cambia tab
   },
   methods: {
     showSnackbar(text, color) {
@@ -210,11 +220,12 @@ export default {
         const response = await fetch('http://localhost:3000/utenti', {
           credentials: 'include'
         });
-        if (!response.ok) throw new Error('Errore nel caricamento degli utenti')
-        const data = await response.json()
+        if (!response.ok) throw new Error('Errore nel caricamento degli utenti');
+        const data = await response.json();
         console.log("Fetched data: ", data);
-
-        this.users = data.utenti.map(user => ({
+        
+        // Dividi gli utenti in base al ruolo
+        this.clientUsers = data.utenti.filter(user => user.role === 'cliente').map(user => ({
           id: user.id,
           nome: user.nome,
           email: user.email,
@@ -222,34 +233,54 @@ export default {
           indirizzo: user.indirizzo,
           role: user.role
         }));
-
+        
+        this.technicianUsers = data.utenti.filter(user => user.role === 'tecnico').map(user => ({
+          id: user.id,
+          nome: user.nome,
+          email: user.email,
+          citta: user.citta,
+          indirizzo: user.indirizzo,
+          role: user.role
+        }));
+        
+        // Per default mostra i clienti
+        this.users = this.clientUsers;
       } catch (error) {
-        console.error('Load users error:', error)
-        this.showSnackbar('Errore nel caricamento degli utenti', 'error')
+        console.error('Load users error:', error);
+        this.showSnackbar('Errore nel caricamento degli utenti', 'error');
       }
     },
-
+    
     async loadTechnicians() {
       this.loadingTechnicians = true;
       try {
+        // Richiedi i dati dettagliati dei tecnici dal backend
         const response = await fetch('http://localhost:3000/tecnici', {
           credentials: 'include'
         });
-
         if (!response.ok) {
-          throw new Error('Errore nel caricamento dei tecnici');
+          throw new Error('Errore nel caricamento dei tecnici dettagliati');
         }
-
         const data = await response.json();
-        this.technicians = data.tecnici;
+        console.log("Dettagli tecnici ricevuti:", data.tecnici);
+
+        // Unisci i dati dettagliati ai dati base ottenuti in loadUsers (da technicianUsers)
+        const mergedTechnicians = this.technicianUsers.map(baseTech => {
+          const detail = data.tecnici.find(dt => dt.auth_user_id === baseTech.id);
+          return detail ? { ...baseTech, ...detail } : baseTech;
+        });
+        
+        this.users = mergedTechnicians;
+        console.log("Tecnici unificati:", mergedTechnicians);
       } catch (error) {
-        console.error('Load technicians error:', error);
+        console.error('Errore caricamento tecnici:', error);
         this.showSnackbar('Errore nel caricamento dei tecnici', 'error');
+        this.users = [];
       } finally {
         this.loadingTechnicians = false;
       }
     },
-
+    
     async submitUser() {
       if (!this.$refs.form.validate()) return
 
@@ -373,6 +404,17 @@ export default {
     openEditTechnicianDialog(tech) {
       // Analogamente, implementa la modifica per i tecnici (eventualmente aprendo un dialog con campi specifici)
       console.log("Modifica tecnico:", tech);
+    },
+    
+    handleTabChange(tabIndex) {
+      console.log("Cambio tab a:", tabIndex);
+      if (tabIndex === 0) {
+        // Mostra la lista dei clienti
+        this.users = this.clientUsers;
+      } else if (tabIndex === 1) {
+        // Carica i dati dei tecnici (basati su technicianUsers)
+        this.loadTechnicians();
+      }
     }
   }
 }

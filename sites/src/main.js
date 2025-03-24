@@ -2,23 +2,11 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import 'leaflet/dist/leaflet.css';
-
-// Vuetify
-import "vuetify/styles";
-import { createVuetify } from "vuetify";
-import * as components from "vuetify/components";
-import * as directives from "vuetify/directives";
+// Import Vuetify from plugins
+import vuetify from './plugins/vuetify';
 import "@mdi/font/css/materialdesignicons.css";
-const vuetify = createVuetify({
-  icons: {
-    iconfont: "mdi",
-  },
-  components,
-  directives,
-  theme: {
-    defaultTheme: "dark",
-  },
-});
+// Importa i CSS globali
+import './assets/styles.css';  // Se hai creato questo file
 
 const app = createApp(App);
 

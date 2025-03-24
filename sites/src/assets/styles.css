@@ -1,0 +1,26 @@
+.rounded-lg {
+  border-radius: 12px !important;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.v-application .elevation-hover {
+  transition: box-shadow 0.3s ease-in-out !important;
+}
+
+.v-application .elevation-hover:hover {
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15) !important;
+}
+
+.v-btn {
+  text-transform: none;
+  letter-spacing: 0.5px;
+}
