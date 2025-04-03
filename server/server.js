@@ -1,5 +1,4 @@
 require("dotenv").config();
-const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 const express = require("express");
 const session = require("express-session");
@@ -8,13 +7,20 @@ const swaggerSetup = require("../swagger");
 const exampleRouter = require("../routes/example");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const port = 3000;
+const port = process.env.PORT || 3000;
 const http = require("http").createServer(app);
 const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.VUE_APP_GOOGLE_CLIENT_ID);
-// Import technician database module
 const tecnicoDb = require("./tecnicoDb");
+const feedbackRouterFactory = require("./feedback");
 const feedbackRouter = require("./feedback");
+const NodeGeocoder = require('node-geocoder');
+
+const geocoder = NodeGeocoder({
+  provider: 'openstreetmap', // o un altro provider che non richieda API key per test
+  httpAdapter: 'https',
+});
+
 const io = require("socket.io")(http, {
   cors: {
     origin: "http://localhost:8080",
@@ -235,8 +241,8 @@ app.post("/auth/register", (req, res) => {
 
           // Pass the same `db` connection to technician creation
           tecnicoDb.createTechnician(
-            db,
             technicianData,
+            geocoder,
             (err, technicianId) => {
               if (err) {
                 console.error("Error creating technician:", err);
@@ -254,7 +260,8 @@ app.post("/auth/register", (req, res) => {
                   technicianId: technicianId,
                 });
               });
-            }
+            },
+            db
           );
         } else {
           // For non-tecnico roles, commit the transaction and send response
@@ -322,76 +329,110 @@ app.post("/auth/google", async (req, res) => {
   const { token } = req.body;
 
   try {
-    // Verifica il token tramite Google API
-    const ticket = await client.verifyIdToken({
-      idToken: token,
-      audience: process.env.VUE_APP_GOOGLE_CLIENT_ID,
-    });
+      const ticket = await client.verifyIdToken({
+          idToken: token,
+          audience: process.env.VUE_APP_GOOGLE_CLIENT_ID,
+      });
 
-    const payload = ticket.getPayload();
-    const { email, name, picture } = payload;
+      const payload = ticket.getPayload();
+      const { email, name, sub: googleId } = payload; // 'sub' è l'ID Google
 
-    // Cerca l'utente nel database sqlite
-    const selectQuery = `SELECT * FROM auth_users WHERE email = ?`;
-    db.get(selectQuery, [email], (err, userRow) => {
-      if (err) {
-        console.error("Error querying database:", err);
-        return res
-          .status(500)
-          .json({ authenticated: false, error: err.message });
+      if (!email) {
+          // Dovrebbe essere sempre presente, ma per sicurezza
+          return res.status(400).json({ authenticated: false, error: "Email not found in Google token." });
       }
 
-      if (userRow) {
-        // Utente già esistente
-        req.session.user = {
-          id: userRow.id,
-          username: userRow.username,
-          role: userRow.role,
-        };
-        return res.json({
-          authenticated: true,
-          user: {
-            email: userRow.email,
-            name: userRow.nome,
-            role: userRow.role,
-          },
-        });
-      } else {
-        // Crea un nuovo utente con dati di default
-        // Usiamo l'email come username e una password di default
-        const insertQuery = `
-          INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role)
-          VALUES (?, 'google_account', ?, ?, '', '', 'cliente')
-        `;
-        db.run(insertQuery, [email, name, email], function (err) {
+      // 1. Cerca per google_id
+      db.get("SELECT * FROM auth_users WHERE google_id = ?", [googleId], (err, userByGoogleId) => {
           if (err) {
-            console.error("Error inserting new user:", err);
-            return res
-              .status(500)
-              .json({ authenticated: false, error: err.message });
+              console.error("Error finding user by google_id:", err);
+              return res.status(500).json({ authenticated: false, error: "Database error checking Google ID." });
           }
-          req.session.user = {
-            id: this.lastID,
-            username: email,
-            role: "cliente",
-          };
-          return res.json({
-            authenticated: true,
-            user: {
-              email: email,
-              name: name,
-              role: "cliente",
-            },
+
+          if (userByGoogleId) {
+              // Utente trovato tramite Google ID, accedi
+              console.log(`Google Login: User found by google_id ${googleId}`);
+              req.session.user = { id: userByGoogleId.id, username: userByGoogleId.username, role: userByGoogleId.role };
+              return res.json({
+                  authenticated: true,
+                  user: { email: userByGoogleId.email, name: userByGoogleId.nome, role: userByGoogleId.role },
+              });
+          }
+
+          // 2. Se non trovato per google_id, cerca per email
+          console.log(`Google Login: User not found by google_id ${googleId}. Searching by email ${email}...`);
+          db.get("SELECT * FROM auth_users WHERE email = ?", [email], (err, userByEmail) => {
+              if (err) {
+                  console.error("Error finding user by email:", err);
+                  return res.status(500).json({ authenticated: false, error: "Database error checking email." });
+              }
+
+              if (userByEmail) {
+                  // Utente trovato tramite email
+                  console.log(`Google Login: User found by email ${email}. Checking google_id...`);
+                  if (userByEmail.google_id && userByEmail.google_id !== googleId) {
+                      // Email associata a un altro account Google!
+                      console.error("Google Login Conflict: Email", email, "linked to google_id", userByEmail.google_id, "but attempting login with", googleId);
+                      return res.status(409).json({ authenticated: false, error: "This email address is already linked to a different Google account." });
+                  } else if (!userByEmail.google_id) {
+                      // Email trovata, ma non ancora collegata a Google ID. Aggiorna e accedi.
+                      console.log(`Google Login: Linking email ${email} to google_id ${googleId}`);
+                      db.run("UPDATE auth_users SET google_id = ? WHERE id = ?", [googleId, userByEmail.id], (err) => {
+                          if (err) {
+                              console.error("Error updating user with google_id:", err);
+                              return res.status(500).json({ authenticated: false, error: "Failed to link Google account." });
+                          }
+                          req.session.user = { id: userByEmail.id, username: userByEmail.username, role: userByEmail.role };
+                          return res.json({
+                              authenticated: true,
+                              user: { email: userByEmail.email, name: userByEmail.nome, role: userByEmail.role },
+                          });
+                      });
+                  } else {
+                      // Email trovata E google_id corrisponde (questo caso non dovrebbe succedere a causa del primo check, ma per sicurezza)
+                      console.log(`Google Login: User found by email ${email} and matching google_id ${googleId}`);
+                      req.session.user = { id: userByEmail.id, username: userByEmail.username, role: userByEmail.role };
+                      return res.json({
+                          authenticated: true,
+                          user: { email: userByEmail.email, name: userByEmail.nome, role: userByEmail.role },
+                      });
+                  }
+              } else {
+                  // 3. Nessun utente trovato. Crea nuovo utente Google.
+                  console.log(`Google Login: No user found for email ${email}. Creating new user...`);
+                  const newUsername = email; // Usiamo email come username, assicurati sia UNIQUE
+                  const insertQuery = `
+                      INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, telefono, role, google_id)
+                      VALUES (?, NULL, ?, ?, '', '', '', 'cliente', ?)
+                  `;
+                  db.run(insertQuery, [newUsername, name, email, googleId], function (err) {
+                      if (err) {
+                          console.error("Error inserting new Google user:", err);
+                          if (err.message.includes("UNIQUE constraint failed: auth_users.email") || err.message.includes("UNIQUE constraint failed: auth_users.username")) {
+                              // Può succedere se c'è una race condition o se l'email è stata usata come username per un account non-google
+                              return res.status(409).json({ authenticated: false, error: "Email or username already exists." });
+                          }
+                           if (err.message.includes("UNIQUE constraint failed: auth_users.google_id")) {
+                               // Teoricamente impossibile a causa del primo check, ma per sicurezza
+                               return res.status(409).json({ authenticated: false, error: "Google account already linked." });
+                           }
+                          return res.status(500).json({ authenticated: false, error: "Failed to create new user." });
+                      }
+                      const newUserId = this.lastID;
+                      console.log(`Google Login: New user created with ID ${newUserId}`);
+                      req.session.user = { id: newUserId, username: newUsername, role: 'cliente' };
+                      return res.json({
+                          authenticated: true,
+                          user: { email: email, name: name, role: 'cliente' },
+                      });
+                  });
+              }
           });
-        });
-      }
-    });
+      });
+
   } catch (error) {
-    console.error("Error verifying Google token:", error);
-    res.status(401).json({
-      authenticated: false,
-      error: "Invalid token",
-    });
+      console.error("Error verifying Google token:", error);
+      res.status(401).json({ authenticated: false, error: "Invalid or expired Google token." });
   }
 });
 
@@ -423,9 +464,9 @@ app.get("/auth/profile", auth, (req, res) => {
   if (!req.session.user || !req.session.user.id) {
     return res.status(401).json({ error: "Not authenticated" });
   }
-  
-  db.get("SELECT id, nome, email, citta, indirizzo, telefono, role FROM auth_users WHERE id = ?", 
-    [req.session.user.id], 
+
+  db.get("SELECT id, nome, email, citta, indirizzo, telefono, role FROM auth_users WHERE id = ?",
+    [req.session.user.id],
     (err, user) => {
       if (err) {
         return res.status(500).json({ error: err.message });
@@ -436,25 +477,6 @@ app.get("/auth/profile", auth, (req, res) => {
       res.json({ user });
     }
   );
-});
-
-app.post("/utenti", (req, res) => {
-  console.log("Received POST request:", req.body);
-  const { nome, email, citta, indirizzo } = req.body;
-
-  const query = `
-        INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, role) 
-        VALUES (?, 'default_password', ?, ?, ?, ?, 'cliente')  -- Default role is 'cliente'
-    `;
-
-  db.run(query, [email, nome, email, citta, indirizzo], function (err) {
-    if (err) {
-      console.error("Database insertion error:", err);
-      return res.status(500).json({ error: err.message });
-    }
-    console.log("User inserted successfully, ID:", this.lastID);
-    res.json({ message: "Nuovo utente creato", id: this.lastID });
-  });
 });
 
 app.get("/utenti", auth, (req, res) => {
@@ -674,7 +696,7 @@ app.get("/tecnici/specializzazione/:spec", (req, res) => {
         return res.status(500).json({ error: err.message });
       }
       res.json({ tecnici: technicians });
-    }
+    }, db
   );
 });
 
@@ -692,18 +714,17 @@ app.get("/tecnici/:id", (req, res) => {
     }
 
     res.json({ tecnico: technician });
-  });
+  }, db);
 });
 
 app.put("/tecnici/:id", auth, (req, res) => {
   const id = req.params.id;
   const technicianData = req.body;
-  // Get auth_user_id from session
   const auth_user_id = req.session.user.id;
 
   tecnicoDb.updateTechnician(
     id,
-    { ...technicianData, auth_user_id: auth_user_id },
+    { ...technicianData, auth_user_id: auth_user_id }, geocoder, 
     (err, changes) => {
       if (err) {
         console.error("Error updating technician:", err);
@@ -715,7 +736,7 @@ app.put("/tecnici/:id", auth, (req, res) => {
       }
 
       res.json({ message: "Tecnico aggiornato con successo" });
-    }
+    }, db
   );
 });
 
@@ -733,7 +754,7 @@ app.delete("/tecnici/:id", auth, (req, res) => {
     }
 
     res.json({ message: "Tecnico eliminato con successo" });
-  });
+  }, db);
 });
 
 app.post("/assistenza", auth, (req, res) => {
@@ -765,19 +786,47 @@ app.post("/assistenza", auth, (req, res) => {
   });
 });
 
+app.get('/assistenze', auth, (req, res) => {
+  const customer_id = req.session.user?.id; // Usa optional chaining
+  if (!customer_id) {
+      // Anche se 'auth' dovrebbe prevenire questo, è una doppia sicurezza
+      return res.status(401).json({ error: 'Autenticazione richiesta o ID utente non trovato in sessione' });
+  }
+
+  const query = `
+      SELECT id, description, urgente, status, created_at
+      FROM assistenza
+      WHERE customer_id = ?
+      ORDER BY created_at DESC
+  `;
+
+  db.all(query, [customer_id], (err, rows) => {
+      if (err) {
+          console.error("Error fetching assistenze:", err);
+          return res.status(500).json({ error: "Errore nel recupero delle richieste di assistenza." });
+      }
+      const assistenze = rows.map(a => ({
+          ...a,
+          created_at: new Date(a.created_at).toLocaleString(), // Formattazione data
+          urgente: Boolean(a.urgente) // Converte 0/1 in false/true
+      }));
+      res.json({ assistenze: assistenze });
+  });
+});
+
 // Add geocoding endpoint
 app.get("/geocode", (req, res) => {
   const address = req.query.address;
   if (!address) {
     return res.status(400).json({ error: "Address is required" });
   }
-  
+
   geocoder.geocode(address)
     .then(results => {
       if (results && results.length > 0) {
-        res.json({ 
-          lat: results[0].latitude, 
-          lng: results[0].longitude 
+        res.json({
+          lat: results[0].latitude,
+          lng: results[0].longitude
         });
       } else {
         res.status(404).json({ error: "Address not found" });
@@ -791,6 +840,7 @@ app.get("/geocode", (req, res) => {
 
 app.use("/", feedbackRouter);
 app.use("/api", exampleRouter);
+app.use('/', feedbackRouterFactory(db));
 
 app.get("/test", (req, res) => {
   res.send("Server is working");
@@ -799,21 +849,11 @@ app.get("/test", (req, res) => {
 swaggerSetup(app);
 
 process.on("SIGINT", () => {
-  // db.close((err) => {
-  //   if (err) {
-  //     return console.error(err.message);
-  //   }
-  //   console.log("Closing the SQLite database.");
-  //   process.exit(0);
-  // });
-
-  // Uncomment the following block if using the mock database module
-
-  mockDb.close((err) => {
+  db.close((err) => {
     if (err) {
-      return console.error(err.message);
+      return console.error("Errore chiusura database:", err.message);
     }
-    console.log("Closing the SQLite mock database.");
+    console.log("Chiusura connessione SQLite.");
     process.exit(0);
   });
 });

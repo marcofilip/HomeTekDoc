@@ -1,7 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-
 const mockDbPath = path.join(__dirname, 'mock.db');
+
 console.log('Mock Database path:', mockDbPath);
 
 let mockDb = new sqlite3.Database(mockDbPath, (err) => {
@@ -13,13 +13,14 @@ let mockDb = new sqlite3.Database(mockDbPath, (err) => {
 mockDb.run(`CREATE TABLE IF NOT EXISTS auth_users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
+    password TEXT,
     nome TEXT NOT NULL,
-    email TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
     citta TEXT NOT NULL,
     indirizzo TEXT NOT NULL,
     telefono TEXT NOT NULL,
     role TEXT CHECK(role IN ('cliente', 'tecnico', 'admin')) NOT NULL,
+    google_id TEXT NULL UNIQUE,
     mod_count INTEGER DEFAULT 0,
     mod_reset INTEGER DEFAULT NULL
 )`, (err) => {
