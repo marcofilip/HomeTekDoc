@@ -43,7 +43,7 @@
       <v-card-title>
         Trova un Tecnico
       </v-card-title>
-      
+
       <!-- Filtri con etichette chiare -->
       <v-card-text>
         <v-row align="center">
@@ -53,63 +53,41 @@
                 <label class="font-weight-medium">Nome:</label>
               </v-col>
               <v-col cols="8">
-                <v-text-field
-                  v-model="nameFilter"
-                  append-icon="mdi-magnify"
-                  hide-details
-                  dense
-                  outlined
-                ></v-text-field>
+                <v-text-field v-model="nameFilter" append-icon="mdi-magnify" hide-details dense outlined></v-text-field>
               </v-col>
             </v-row>
           </v-col>
-          
+
           <v-col cols="12" sm="6" md="3">
             <v-row no-gutters align="center">
               <v-col cols="4">
                 <label class="font-weight-medium">Specializzazione:</label>
               </v-col>
               <v-col cols="8">
-                <v-text-field
-                  v-model="specializzazioneFilter"
-                  append-icon="mdi-magnify"
-                  hide-details
-                  dense
-                  outlined
-                ></v-text-field>
+                <v-text-field v-model="specializzazioneFilter" append-icon="mdi-magnify" hide-details dense
+                  outlined></v-text-field>
               </v-col>
             </v-row>
           </v-col>
-          
+
           <v-col cols="12" sm="6" md="3">
             <v-row no-gutters align="center">
               <v-col cols="4">
                 <label class="font-weight-medium">Disponibilità:</label>
               </v-col>
               <v-col cols="8">
-                <v-text-field
-                  v-model="disponibilitaFilter"
-                  hide-details
-                  dense
-                  outlined
-                ></v-text-field>
+                <v-text-field v-model="disponibilitaFilter" hide-details dense outlined></v-text-field>
               </v-col>
             </v-row>
           </v-col>
-          
+
           <v-col cols="12" sm="6" md="3">
             <v-row no-gutters align="center">
               <v-col cols="4">
                 <label class="font-weight-medium">Rating minimo:</label>
               </v-col>
               <v-col cols="8">
-                <v-text-field
-                  v-model="minRatingFilter"
-                  type="number"
-                  hide-details
-                  dense
-                  outlined
-                ></v-text-field>
+                <v-text-field v-model="minRatingFilter" type="number" hide-details dense outlined></v-text-field>
               </v-col>
             </v-row>
           </v-col>
@@ -129,7 +107,9 @@
               <v-card-text>
                 <p><v-icon small>mdi-email</v-icon> {{ tech.email }}</p>
                 <p><v-icon small>mdi-map-marker</v-icon> {{ tech.citta }}, {{ tech.indirizzo }}</p>
-                <p><v-icon small>mdi-hammer-wrench</v-icon> <strong>Specializzazione:</strong> {{ tech.specializzazione }}</p>
+                <p><v-icon small>mdi-hammer-wrench</v-icon> <strong>Specializzazione:</strong> {{ tech.specializzazione
+                }}
+                </p>
                 <p><v-icon small>mdi-briefcase</v-icon> Esperienza: {{ tech.esperienza_anni || 'N/A' }} anni</p>
                 <p><v-icon small>mdi-cash</v-icon> Tariffa: {{ tech.tariffa_oraria || 'N/A' }}€/ora</p>
                 <p v-if="tech.disponibilita"><v-icon small>mdi-calendar</v-icon> {{ tech.disponibilita }}</p>
@@ -162,21 +142,13 @@
         <v-card-title>Richiesta di Assistenza</v-card-title>
         <v-card-text>
           <v-form ref="assistanceForm" v-model="assistanceFormValid">
-            <p class="mb-4">Stai richiedendo assistenza a: <strong>{{ selectedTechnician.nome }}</strong> ({{ selectedTechnician.specializzazione }})</p>
-            
-            <v-textarea
-              v-model="assistanceDescription"
-              label="Descrivi il problema"
-              :rules="[v => !!v || 'Descrizione obbligatoria']"
-              required
-              rows="4"
-              outlined
-            ></v-textarea>
-            
-            <v-checkbox
-              v-model="assistanceUrgent"
-              label="Richiesta Urgente"
-            ></v-checkbox>
+            <p class="mb-4">Stai richiedendo assistenza a: <strong>{{ selectedTechnician.nome }}</strong> ({{
+              selectedTechnician.specializzazione }})</p>
+
+            <v-textarea v-model="assistanceDescription" label="Descrivi il problema"
+              :rules="[v => !!v || 'Descrizione obbligatoria']" required rows="4" outlined></v-textarea>
+
+            <v-checkbox v-model="assistanceUrgent" label="Richiesta Urgente"></v-checkbox>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -205,7 +177,6 @@
 <script>
 import TechnicianMap from '@/components/TechnicianMap.vue';
 import FeedbackForm from '@/components/FeedbackForm.vue';
-import axios from 'axios';
 
 export default {
   name: 'ClienteView',
@@ -216,7 +187,6 @@ export default {
   data() {
     return {
       technicians: [],
-      // New filter models
       nameFilter: '',
       specializzazioneFilter: '',
       disponibilitaFilter: '',
@@ -236,11 +206,11 @@ export default {
         { text: 'Tecnico', value: 'technicianName' },
         { text: 'Azioni', value: 'actions', sortable: false }
       ],
-      
+
       // Per il dialog di feedback
       feedbackDialog: false,
       selectedAssistenza: {},
-      
+
       // Per il dialog di richiesta assistenza
       assistanceDialog: false,
       selectedTechnician: {},
@@ -273,86 +243,200 @@ export default {
     this.fetchAssistenze();
   },
   methods: {
-    async fetchTechnicians() {
+    fetchTechnicians() {
       this.loading = true;
       this.error = null;
-      try {
-        const params = new URLSearchParams();
-        if (this.specializzazioneFilter) params.append("specializzazione", this.specializzazioneFilter);
-        if (this.disponibilitaFilter) params.append("disponibilita", this.disponibilitaFilter);
-        if (this.minRatingFilter) params.append("min_rating", this.minRatingFilter);
-        if (this.clientLocation) {
-          params.append("client_lat", this.clientLocation.lat);
-          params.append("client_lng", this.clientLocation.lng);
-        }
-        const response = await fetch(`http://localhost:3000/tecnici?${params.toString()}`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error('Errore nel caricamento dei tecnici');
-        }
-        const data = await response.json();
-        this.technicians = data.tecnici.map(tech => ({
-          ...tech,
-          latitudine: parseFloat(tech.latitudine) || null,
-          longitudine: parseFloat(tech.longitudine) || null
-        }));
-      } catch (error) {
-        console.error('Error fetching technicians:', error);
-        this.error = error.message;
-      } finally {
-        this.loading = false;
+      const params = new URLSearchParams();
+      if (this.specializzazioneFilter) params.append("specializzazione", this.specializzazioneFilter);
+      if (this.disponibilitaFilter) params.append("disponibilita", this.disponibilitaFilter);
+      if (this.minRatingFilter) params.append("min_rating", this.minRatingFilter);
+      if (this.clientLocation) {
+        params.append("client_lat", this.clientLocation.lat);
+        params.append("client_lng", this.clientLocation.lng);
       }
-    },
+      const url = `http://localhost:3000/tecnici?${params.toString()}`;
 
-    // Carica le assistenze dell'utente
-    async fetchAssistenze() {
-      this.loadingAssistenze = true;
-      try {
-        const response = await axios.get('http://localhost:3000/assistenze', {
-          withCredentials: true
-        });
-        this.assistenze = response.data.assistenze.map(a => ({
-          ...a,
-          created_at: new Date(a.created_at).toLocaleString(),
-          urgente: Boolean(a.urgente),
-          feedbackSent: Boolean(a.feedback_id)
-        }));
-      } catch (error) {
-        console.error('Errore nel recupero delle assistenze:', error);
-        this.showSnackbar('Impossibile caricare le assistenze', 'error');
-      } finally {
-        this.loadingAssistenze = false;
-      }
-    },
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.withCredentials = true;
 
-    async getClientLocation() {
-      try {
-        // First get the current user's profile
-        const response = await axios.get('http://localhost:3000/auth/profile', {
-          withCredentials: true
-        });
-        
-        if (response.data && response.data.user) {
-          const userAddress = `${response.data.user.indirizzo}, ${response.data.user.citta}`;
-          
-          // Use geocoding to convert address to coordinates
-          const geocodeResponse = await axios.get('http://localhost:3000/geocode', {
-            params: { address: userAddress },
-            withCredentials: true
-          });
-          
-          if (geocodeResponse.data && geocodeResponse.data.lat && geocodeResponse.data.lng) {
-            this.clientLocation = {
-              lat: geocodeResponse.data.lat,
-              lng: geocodeResponse.data.lng
-            };
-            this.fetchTechnicians();
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            this.technicians = (data.tecnici || []).map(tech => ({ // Aggiunto controllo || []
+              ...tech,
+              latitudine: parseFloat(tech.latitudine) || null,
+              longitudine: parseFloat(tech.longitudine) || null
+            }));
+          } else {
+            console.error('Errore HTTP fetchTechnicians:', xhr.status, xhr.statusText);
+            this.error = `Errore ${xhr.status} nel caricamento dei tecnici`;
+            this.technicians = []; // Svuota in caso di errore
           }
+        } catch (e) {
+          console.error('Errore parsing JSON fetchTechnicians:', e);
+          this.error = 'Errore nella risposta del server (tecnici)';
+          this.technicians = [];
+        } finally {
+          this.loading = false;
         }
-      } catch (error) {
-        console.error("Error getting client location from profile:", error);
-      }
+      };
+
+      xhr.onerror = () => {
+        console.error('Errore di rete fetchTechnicians');
+        this.error = 'Errore di rete nel caricamento dei tecnici';
+        this.technicians = [];
+        this.loading = false;
+      };
+
+      xhr.send();
+    },
+
+    fetchAssistenze() {
+      this.loadingAssistenze = true;
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'http://localhost:3000/assistenze', true);
+      xhr.withCredentials = true;
+
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            this.assistenze = (data.assistenze || []).map(a => ({ // Aggiunto controllo || []
+              ...a,
+              // La formattazione della data è già gestita correttamente dal backend
+              // created_at: new Date(a.created_at).toLocaleString(),
+              urgente: Boolean(a.urgente),
+              // feedbackSent: Boolean(a.feedback_id) // Questo campo manca nella risposta API attuale
+            }));
+          } else {
+            console.error('Errore HTTP fetchAssistenze:', xhr.status, xhr.statusText);
+            this.showSnackbar('Impossibile caricare le assistenze', 'error');
+            this.assistenze = [];
+          }
+        } catch (e) {
+          console.error('Errore parsing JSON fetchAssistenze:', e);
+          this.showSnackbar('Errore nella risposta del server (assistenze)', 'error');
+          this.assistenze = [];
+        } finally {
+          this.loadingAssistenze = false;
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error('Errore di rete fetchAssistenze');
+        this.showSnackbar('Errore di rete nel caricamento delle assistenze', 'error');
+        this.assistenze = [];
+        this.loadingAssistenze = false;
+      };
+
+      xhr.send();
+    },
+
+    getClientLocation() {
+      // Step 1: Get profile
+      const profileXhr = new XMLHttpRequest();
+      profileXhr.open('GET', 'http://localhost:3000/auth/profile', true);
+      profileXhr.withCredentials = true;
+
+      profileXhr.onload = () => {
+        if (profileXhr.status >= 200 && profileXhr.status < 300) {
+          try {
+            const profileData = JSON.parse(profileXhr.responseText);
+            if (profileData && profileData.user) {
+              const userAddress = `${profileData.user.indirizzo}, ${profileData.user.citta}`;
+
+              // Step 2: Geocode address
+              const geocodeXhr = new XMLHttpRequest();
+              const geocodeUrl = `http://localhost:3000/geocode?address=${encodeURIComponent(userAddress)}`;
+              geocodeXhr.open('GET', geocodeUrl, true);
+              geocodeXhr.withCredentials = true; // Anche se forse non serve per geocode
+
+              geocodeXhr.onload = () => {
+                if (geocodeXhr.status >= 200 && geocodeXhr.status < 300) {
+                  try {
+                    const geocodeData = JSON.parse(geocodeXhr.responseText);
+                    if (geocodeData && geocodeData.lat && geocodeData.lng) {
+                      this.clientLocation = {
+                        lat: geocodeData.lat,
+                        lng: geocodeData.lng
+                      };
+                      this.fetchTechnicians(); // Richiama con la nuova posizione
+                    } else {
+                      console.warn("Geocoding non ha restituito coordinate valide.");
+                    }
+                  } catch (e) {
+                    console.error("Errore parsing JSON geocode:", e);
+                  }
+                } else {
+                  console.error("Errore HTTP geocode:", geocodeXhr.status, geocodeXhr.statusText);
+                }
+              };
+              geocodeXhr.onerror = () => console.error("Errore di rete geocode.");
+              geocodeXhr.send();
+
+            } else {
+              console.warn("Dati profilo utente non trovati.");
+            }
+          } catch (e) {
+            console.error("Errore parsing JSON profilo:", e);
+          }
+        } else {
+          console.error("Errore HTTP profilo:", profileXhr.status, profileXhr.statusText);
+        }
+      };
+      profileXhr.onerror = () => console.error("Errore di rete profilo.");
+      profileXhr.send();
+    },
+
+    submitAssistanceRequest() {
+      if (!this.$refs.assistanceForm.validate()) return;
+
+      this.assistanceLoading = true;
+      const payload = {
+          description: this.assistanceDescription,
+          urgente: this.assistanceUrgent,
+          // technician_id: this.selectedTechnician.id // Importante: l'endpoint POST /assistenza attuale non sembra usare technician_id! Lo rimuoviamo per ora.
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'http://localhost:3000/assistenza', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.withCredentials = true;
+
+      xhr.onload = () => {
+         try {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                const responseData = JSON.parse(xhr.responseText);
+                this.showSnackbar(responseData.message || 'Richiesta inviata con successo', 'success');
+
+                // Apri mailto (logica invariata)
+                const mailtoUrl = `mailto:${this.selectedTechnician.email}?subject=Richiesta assistenza tecnica&body=Salve ${this.selectedTechnician.nome},%0D%0A%0D%0ASono un cliente HomeTekDoc e vorrei richiedere la sua assistenza per:%0D%0A%0D%0A${encodeURIComponent(this.assistanceDescription)}%0D%0A%0D%0ATipo di assistenza: ${this.assistanceUrgent ? 'Urgente' : 'Standard'}%0D%0AIndirizzo: [Il mio indirizzo]%0D%0ADisponibilità: [Indicare quando si è disponibili]%0D%0A%0D%0AGrazie,%0D%0A[Il tuo nome]`;
+                window.location.href = mailtoUrl;
+
+                this.assistanceDialog = false;
+                this.fetchAssistenze(); // Aggiorna la lista
+            } else {
+                 console.error("Errore HTTP submitAssistanceRequest:", xhr.status, xhr.statusText);
+                 const errorData = JSON.parse(xhr.responseText);
+                 this.showSnackbar(errorData.error || 'Errore nell\'invio della richiesta', 'error');
+            }
+         } catch(e) {
+              console.error("Errore parsing JSON submitAssistanceRequest:", e);
+              this.showSnackbar('Errore nella risposta del server (assistenza)', 'error');
+         } finally {
+              this.assistanceLoading = false;
+         }
+      };
+
+      xhr.onerror = () => {
+          console.error('Errore di rete submitAssistanceRequest');
+          this.showSnackbar('Errore di rete nell\'invio della richiesta', 'error');
+          this.assistanceLoading = false;
+      };
+
+      xhr.send(JSON.stringify(payload));
     },
 
     handleRequestSent(data) {
@@ -388,39 +472,6 @@ export default {
       this.assistanceDescription = '';
       this.assistanceUrgent = false;
       this.assistanceDialog = true;
-    },
-
-    // Nuovo metodo per inviare la richiesta di assistenza
-    async submitAssistanceRequest() {
-      if (!this.$refs.assistanceForm.validate()) return;
-
-      this.assistanceLoading = true;
-      try {
-        // Invia la richiesta al backend
-        const response = await axios.post('http://localhost:3000/assistenza', {
-          description: this.assistanceDescription,
-          urgente: this.assistanceUrgent,
-          technician_id: this.selectedTechnician.id
-        }, { withCredentials: true });
-
-        if (response.data) {
-          this.showSnackbar('Richiesta inviata con successo', 'success');
-          
-          // Apri l'email con il testo del problema
-          const mailtoUrl = `mailto:${this.selectedTechnician.email}?subject=Richiesta assistenza tecnica&body=Salve ${this.selectedTechnician.nome},%0D%0A%0D%0ASono un cliente HomeTekDoc e vorrei richiedere la sua assistenza per:%0D%0A%0D%0A${encodeURIComponent(this.assistanceDescription)}%0D%0A%0D%0ATipo di assistenza: ${this.assistanceUrgent ? 'Urgente' : 'Standard'}%0D%0AIndirizzo: ${this.selectedTechnician.citta}%0D%0ADisponibilità: [Indicare quando si è disponibili]%0D%0A%0D%0AGrazie,%0D%0A[Il tuo nome]`;
-          
-          window.location.href = mailtoUrl;
-          
-          // Chiudi il dialog e aggiorna le richieste
-          this.assistanceDialog = false;
-          this.fetchAssistenze();
-        }
-      } catch (error) {
-        console.error('Errore nell\'invio della richiesta:', error);
-        this.showSnackbar('Errore nell\'invio della richiesta', 'error');
-      } finally {
-        this.assistanceLoading = false;
-      }
     },
 
     showSnackbar(text, color) {

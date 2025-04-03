@@ -38,7 +38,7 @@
                     <v-list-item-subtitle>
                       Indirizzo: {{ user.indirizzo }}
                     </v-list-item-subtitle>
-                    
+
                     <template v-slot:append>
                       <v-btn icon color="primary" @click="openEditDialog(user)">
                         <v-icon>mdi-pencil</v-icon>
@@ -61,12 +61,8 @@
             <v-card>
               <v-card-title>Lista Tecnici</v-card-title>
               <v-card-text>
-                <v-data-table 
-                  :headers="techHeaders" 
-                  :items="technicians" 
-                  :loading="loadingTechnicians"
-                  class="elevation-1"
-                >
+                <v-data-table :headers="techHeaders" :items="technicians" :loading="loadingTechnicians"
+                  class="elevation-1">
                   <template v-slot:[`item.actions`]="{ item }">
                     <v-btn icon color="primary" size="small" @click="editTechnician(item.raw)">
                       <v-icon>mdi-pencil</v-icon>
@@ -185,6 +181,7 @@ export default {
       activeTab: 0,
       technicians: [],
       techSearch: '',
+      loadingUsers: false,
       loadingTechnicians: false,
       techHeaders: [
         { title: 'Nome', key: 'nome' },
@@ -206,7 +203,6 @@ export default {
   },
   mounted() {
     this.loadUsers();
-    // Non caricare i tecnici qui, lo facciamo quando si cambia tab
   },
   methods: {
     showSnackbar(text, color) {
@@ -215,101 +211,87 @@ export default {
       this.snackbar.show = true;
     },
 
-    async loadUsers() {
-      try {
-        const response = await fetch('http://localhost:3000/utenti', {
-          credentials: 'include'
-        });
-        if (!response.ok) throw new Error('Errore nel caricamento degli utenti');
-        const data = await response.json();
-        console.log("Fetched data: ", data);
-        
-        // Dividi gli utenti in base al ruolo
-        this.clientUsers = data.utenti.filter(user => user.role === 'cliente').map(user => ({
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          citta: user.citta,
-          indirizzo: user.indirizzo,
-          role: user.role
-        }));
-        
-        this.technicianUsers = data.utenti.filter(user => user.role === 'tecnico').map(user => ({
-          id: user.id,
-          nome: user.nome,
-          email: user.email,
-          citta: user.citta,
-          indirizzo: user.indirizzo,
-          role: user.role
-        }));
-        
-        // Per default mostra i clienti
-        this.users = this.clientUsers;
-      } catch (error) {
-        console.error('Load users error:', error);
-        this.showSnackbar('Errore nel caricamento degli utenti', 'error');
-      }
+    loadUsers() {
+      this.loadingUsers = true;
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'http://localhost:3000/utenti', true);
+      xhr.withCredentials = true;
+
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            console.log("Fetched data (UtentiView): ", data);
+            // Divisione utenti (logica invariata)
+            this.clientUsers = (data.utenti || []).filter(user => user.role === 'cliente').map(/*...*/);
+            this.technicianUsers = (data.utenti || []).filter(user => user.role === 'tecnico').map(/*...*/);
+            // Mostra i clienti di default
+            this.handleTabChange(this.activeTab); // Chiama handleTabChange per aggiornare this.users
+          } else {
+            console.error("Errore HTTP loadUsers:", xhr.status, xhr.statusText);
+            this.showSnackbar('Errore nel caricamento degli utenti', 'error');
+            this.clientUsers = [];
+            this.technicianUsers = [];
+            this.users = [];
+          }
+        } catch (e) {
+          console.error("Errore parsing JSON loadUsers:", e);
+          this.showSnackbar('Errore nella risposta del server (utenti)', 'error');
+          this.clientUsers = [];
+          this.technicianUsers = [];
+          this.users = [];
+        } finally {
+          this.loadingUsers = false;
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error("Errore di rete loadUsers");
+        this.showSnackbar('Errore di rete nel caricamento utenti', 'error');
+        this.loadingUsers = false;
+      };
+
+      xhr.send();
     },
-    
-    async loadTechnicians() {
+
+    loadTechnicians() {
       this.loadingTechnicians = true;
-      try {
-        // Richiedi i dati dettagliati dei tecnici dal backend
-        const response = await fetch('http://localhost:3000/tecnici', {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          throw new Error('Errore nel caricamento dei tecnici dettagliati');
-        }
-        const data = await response.json();
-        console.log("Dettagli tecnici ricevuti:", data.tecnici);
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', 'http://localhost:3000/tecnici', true);
+      xhr.withCredentials = true;
 
-        // Unisci i dati dettagliati ai dati base ottenuti in loadUsers (da technicianUsers)
-        const mergedTechnicians = this.technicianUsers.map(baseTech => {
-          const detail = data.tecnici.find(dt => dt.auth_user_id === baseTech.id);
-          return detail ? { ...baseTech, ...detail } : baseTech;
-        });
-        
-        this.users = mergedTechnicians;
-        console.log("Tecnici unificati:", mergedTechnicians);
-      } catch (error) {
-        console.error('Errore caricamento tecnici:', error);
-        this.showSnackbar('Errore nel caricamento dei tecnici', 'error');
-        this.users = [];
-      } finally {
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            console.log("Dettagli tecnici ricevuti (UtentiView):", data.tecnici);
+            // Unisci dati (logica invariata)
+            const mergedTechnicians = this.technicianUsers.map(baseTech => {
+              const detail = (data.tecnici || []).find(dt => dt.auth_user_id === baseTech.id);
+              return detail ? { ...baseTech, ...detail } : baseTech;
+            });
+            this.users = mergedTechnicians; // Aggiorna la lista visualizzata
+          } else {
+            console.error("Errore HTTP loadTechnicians:", xhr.status, xhr.statusText);
+            this.showSnackbar('Errore nel caricamento dei tecnici', 'error');
+            this.users = [];
+          }
+        } catch (e) {
+          console.error("Errore parsing JSON loadTechnicians:", e);
+          this.showSnackbar('Errore nella risposta del server (tecnici)', 'error');
+          this.users = [];
+        } finally {
+          this.loadingTechnicians = false;
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error("Errore di rete loadTechnicians");
+        this.showSnackbar('Errore di rete nel caricamento tecnici', 'error');
         this.loadingTechnicians = false;
-      }
-    },
-    
-    async submitUser() {
-      if (!this.$refs.form.validate()) return
+      };
 
-      try {
-        const response = await fetch('http://localhost:3000/utenti', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify(this.newUser)
-        })
-
-        if (!response.ok) throw new Error('Errore nell\'aggiunta dell\'utente')
-
-        this.showSnackbar('Utente aggiunto con successo', 'success')
-        this.$refs.form.reset()
-        this.newUser = {
-          nome: '',
-          email: '',
-          citta: '',
-          indirizzo: '',
-          role: '' // Reset role
-        }
-        await this.loadUsers()
-      } catch (error) {
-        console.error('Submit user error:', error)
-        this.showSnackbar('Errore nell\'aggiunta dell\'utente', 'error')
-      }
+      xhr.send();
     },
 
     confirmDelete(id) {
@@ -318,23 +300,40 @@ export default {
       this.deleteDialog = true;
     },
 
-    async deleteUser() {
-      try {
-        console.log('Deleting user with ID:', this.userToDelete);
-        const response = await fetch(`http://localhost:3000/utenti/${this.userToDelete}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        });
+    deleteUser() {
+      console.log('Deleting user with ID:', this.userToDelete);
+      const xhr = new XMLHttpRequest();
+      xhr.open('DELETE', `http://localhost:3000/utenti/${this.userToDelete}`, true);
+      xhr.withCredentials = true;
 
-        if (!response.ok) throw new Error('Errore nell\'eliminazione dell\'utente');
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            this.showSnackbar(data.message || 'Utente eliminato con successo', 'success');
+            this.deleteDialog = false;
+            this.loadUsers(); // Ricarica utenti dopo eliminazione
+          } else {
+            console.error("Errore HTTP deleteUser:", xhr.status, xhr.statusText);
+            const errorData = JSON.parse(xhr.responseText);
+            this.showSnackbar(errorData.error || 'Errore nell\'eliminazione dell\'utente', 'error');
+          }
+        } catch (e) {
+          console.error("Errore parsing JSON deleteUser:", e);
+          this.showSnackbar('Errore nella risposta del server (delete user)', 'error');
+        } finally {
+          // Nascondi dialogo anche in caso di errore? Forse sì.
+          this.deleteDialog = false;
+        }
+      };
 
-        this.showSnackbar('Utente eliminato con successo', 'success');
+      xhr.onerror = () => {
+        console.error("Errore di rete deleteUser");
+        this.showSnackbar('Errore di rete nell\'eliminazione', 'error');
         this.deleteDialog = false;
-        await this.loadUsers();
-      } catch (error) {
-        console.error('Delete user error:', error);
-        this.showSnackbar('Errore nell\'eliminazione dell\'utente', 'error');
-      }
+      };
+
+      xhr.send();
     },
 
     editTechnician(technician) {
@@ -347,24 +346,38 @@ export default {
       this.deleteTechDialog = true;
     },
 
-    async deleteTechnicianConfirmed() {
-      try {
-        const response = await fetch(`http://localhost:3000/tecnici/${this.technicianToDelete}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        });
+    deleteTechnicianConfirmed() {
+      const xhr = new XMLHttpRequest();
+      xhr.open('DELETE', `http://localhost:3000/tecnici/${this.technicianToDelete}`, true);
+      xhr.withCredentials = true;
 
-        if (!response.ok) {
-          throw new Error('Errore nell\'eliminazione del tecnico');
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            this.showSnackbar(data.message || 'Tecnico eliminato con successo', 'success');
+            this.deleteTechDialog = false;
+            this.loadUsers(); // Ricarica tutto per aggiornare anche la lista base dei tecnici
+          } else {
+            console.error("Errore HTTP deleteTechnician:", xhr.status, xhr.statusText);
+            const errorData = JSON.parse(xhr.responseText);
+            this.showSnackbar(errorData.error || 'Errore nell\'eliminazione del tecnico', 'error');
+          }
+        } catch (e) {
+          console.error("Errore parsing JSON deleteTechnician:", e);
+          this.showSnackbar('Errore nella risposta del server (delete tech)', 'error');
+        } finally {
+          this.deleteTechDialog = false;
         }
+      };
 
-        this.showSnackbar('Tecnico eliminato con successo', 'success');
+      xhr.onerror = () => {
+        console.error("Errore di rete deleteTechnician");
+        this.showSnackbar('Errore di rete nell\'eliminazione', 'error');
         this.deleteTechDialog = false;
-        await this.loadTechnicians();
-      } catch (error) {
-        console.error('Delete technician error:', error);
-        this.showSnackbar('Errore nell\'eliminazione del tecnico', 'error');
-      }
+      };
+
+      xhr.send();
     },
 
     openEditDialog(user) {
@@ -373,47 +386,67 @@ export default {
       this.editDialog = true;
     },
 
-    async updateUser() {
+    updateUser() {
       if (!this.$refs.editForm.validate()) return;
-      try {
-        const response = await fetch(`http://localhost:3000/utenti/${this.editUserData.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            nome: this.editUserData.nome,
-            email: this.editUserData.email,
-            citta: this.editUserData.citta,
-            indirizzo: this.editUserData.indirizzo,
-          })
-        });
-        if (response.ok) {
-          this.showSnackbar('Utente aggiornato con successo', 'success');
-          this.editDialog = false;
-          await this.loadUsers();
-        } else {
-          const data = await response.json();
-          this.showSnackbar(data.error || 'Errore nell\'aggiornamento', 'error');
+      const payload = {
+        nome: this.editUserData.nome,
+        email: this.editUserData.email,
+        citta: this.editUserData.citta,
+        indirizzo: this.editUserData.indirizzo,
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', `http://localhost:3000/utenti/${this.editUserData.id}`, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.withCredentials = true;
+
+      xhr.onload = () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            this.showSnackbar(data.message || 'Utente aggiornato con successo', 'success');
+            this.editDialog = false;
+            this.loadUsers(); // Ricarica
+          } else {
+            console.error("Errore HTTP updateUser:", xhr.status, xhr.statusText);
+            const errorData = JSON.parse(xhr.responseText);
+            this.showSnackbar(errorData.error || 'Errore nell\'aggiornamento', 'error');
+          }
+        } catch (e) {
+          console.error("Errore parsing JSON updateUser:", e);
+          this.showSnackbar('Errore nella risposta del server (update user)', 'error');
         }
-      } catch (error) {
-        console.error('Update user error:', error);
-        this.showSnackbar('Errore nell\'aggiornamento', 'error');
-      }
+        // Non chiudere il dialogo in caso di errore? Forse sì
+        // this.editDialog = false;
+      };
+
+      xhr.onerror = () => {
+        console.error("Errore di rete updateUser");
+        this.showSnackbar('Errore di rete nell\'aggiornamento', 'error');
+      };
+
+      xhr.send(JSON.stringify(payload));
     },
 
     openEditTechnicianDialog(tech) {
       // Analogamente, implementa la modifica per i tecnici (eventualmente aprendo un dialog con campi specifici)
       console.log("Modifica tecnico:", tech);
     },
-    
+
     handleTabChange(tabIndex) {
+      // Logica leggermente modificata per chiamare loadTechnicians solo se necessario
       console.log("Cambio tab a:", tabIndex);
-      if (tabIndex === 0) {
-        // Mostra la lista dei clienti
+      if (tabIndex === 0) { // Utenti (Clienti)
         this.users = this.clientUsers;
-      } else if (tabIndex === 1) {
-        // Carica i dati dei tecnici (basati su technicianUsers)
-        this.loadTechnicians();
+      } else if (tabIndex === 1) { // Tecnici
+        // Mostra i tecnici già caricati se presenti, altrimenti caricali
+        if (this.technicianUsers.length > 0 && this.users !== this.technicianUsers) { // Evita ricariche non necessarie
+          this.loadTechnicians();
+        } else if (this.technicianUsers.length === 0) { // Se non ci sono proprio tecnici base
+          this.users = []; // Svuota la lista
+        } else {
+          // Se this.users sono già i tecnici uniti, non fare nulla
+        }
       }
     }
   }

@@ -8,7 +8,7 @@ import ClienteView from "../views/ClienteView.vue";
 import TecnicoView from "../views/TecnicoView.vue";
 import ChatView from "../views/ChatView.vue";
 import AboutView from "../views/AboutView.vue";
-import axios from "axios";
+// Rimosso: import axios from "axios"; // Non più necessario qui
 
 const routes = [
   {
@@ -35,6 +35,7 @@ const routes = [
     path: "/utenti",
     name: "utenti",
     component: UtentiView,
+    // Le meta informazioni rimangono utili per il futuro o per logica nel componente
     meta: { requiresAuth: true, requiredRole: "admin" },
   },
   {
@@ -53,6 +54,7 @@ const routes = [
     path: "/chat",
     name: "chat",
     component: ChatView,
+    // Aggiungere meta se necessario, es: { requiresAuth: true }
   },
   {
     path: "/faq",
@@ -66,29 +68,18 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach(async (to, from, next) => {
-  const requiresAuth = to.meta.requiresAuth;
-  const requiredRole = to.meta.requiredRole;
-  let isAuthenticated = false;
-  let userRole = null;
-
-  try {
-    const response = await axios.get("http://localhost:3000/auth/check", {
-      withCredentials: true,
-    });
-    isAuthenticated = response.data.authenticated;
-    userRole = response.data.user ? response.data.user.role : null;
-  } catch (error) {
-    console.error("Error checking authentication:", error);
-  }
-
-  if (requiresAuth && !isAuthenticated) {
-    next("/login"); // Redirect to login if not authenticated
-  } else if (requiredRole && userRole !== requiredRole) {
-    next("/"); // Redirect to home or a "forbidden" page
-  } else {
-    next(); // Proceed to the route
-  }
+// --- INIZIO MODIFICA ---
+// La vecchia logica con la chiamata API è stata rimossa.
+// Per la modalità sviluppo, permettiamo tutte le navigazioni.
+// La protezione vera avverrà a livello API nel backend e tramite
+// l'abilitazione/disabilitazione dei link/pulsanti in App.vue.
+router.beforeEach((to, from, next) => {
+  console.log(`Router Guard: Navigating from ${from.path} to ${to.path}.`);
+  // In futuro, qui si leggerà lo stato da Pinia/Vuex per decidere se
+  // permettere (next()), reindirizzare a login (next('/login')),
+  // o reindirizzare altrove (next('/forbidden')).
+  next(); // Permette sempre la navigazione
 });
+// --- FINE MODIFICA ---
 
 export default router;

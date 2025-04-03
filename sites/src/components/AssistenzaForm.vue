@@ -26,45 +26,69 @@
 </template>
 
 <script>
-import axios from 'axios';
+// Rimosso: import axios from 'axios';
 
 export default {
   name: 'AssistenzaForm',
   data() {
-    return {
-      description: '',
-      urgent: false,
-      valid: false,
-      loading: false,
-    }
+    // ... (dati esistenti)
   },
   methods: {
-    async submitRequest() {
+    submitRequest() {
       if (!this.$refs.form.validate()) return;
       this.loading = true;
-      try {
-        const response = await axios.post('http://localhost:3000/assistenza', {
-          description: this.description,
-          urgente: this.urgent,
-        }, { withCredentials: true });
-        if(response.data.message){
-          this.$emit('requestSent', response.data);
-          // Puoi anche mostrare una notifica o resettare il form
-          this.description = '';
-          this.urgent = false;
-          this.$refs.form.resetValidation();
+
+      const payload = {
+        description: this.description,
+        urgente: this.urgent,
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'http://localhost:3000/assistenza', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.withCredentials = true;
+
+      xhr.onload = () => {
+        try {
+           if (xhr.status >= 200 && xhr.status < 300) {
+              const responseData = JSON.parse(xhr.responseText);
+              if (responseData.message) {
+                 this.$emit('requestSent', responseData); // Emette l'evento al genitore
+                 // Reset form
+                 this.description = '';
+                 this.urgent = false;
+                 if (this.$refs.form) {
+                     this.$refs.form.resetValidation();
+                 }
+              } else {
+                   // Caso strano: successo HTTP ma manca messaggio?
+                   console.warn("Richiesta assistenza inviata, ma manca messaggio di conferma nella risposta.");
+                   this.$emit('requestSent', { message: 'Richiesta inviata (senza conferma specifica).' }); // Emetti comunque?
+              }
+           } else {
+               console.error("Errore HTTP invio assistenza:", xhr.status, xhr.statusText);
+               const errorData = JSON.parse(xhr.responseText);
+               this.$emit('requestError', errorData.error || 'Errore sconosciuto'); // Emetti un evento di errore
+           }
+        } catch(e) {
+            console.error("Errore parsing JSON invio assistenza:", e);
+            this.$emit('requestError', 'Errore nella risposta del server'); // Emetti errore generico
+        } finally {
+           this.loading = false;
         }
-      } catch (error) {
-        console.error('Errore durante l\'invio della richiesta:', error);
-        // Gestisci l'errore (es. mostrando uno snackbar)
-      } finally {
+      };
+
+      xhr.onerror = () => {
+        console.error('Errore di rete invio assistenza');
+        this.$emit('requestError', 'Errore di rete'); // Emetti errore di rete
         this.loading = false;
-      }
+      };
+
+      xhr.send(JSON.stringify(payload));
     }
   }
 }
 </script>
 
 <style scoped>
-/* Eventuali stili personalizzati */
 </style>

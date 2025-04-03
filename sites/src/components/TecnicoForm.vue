@@ -41,8 +41,6 @@
 </template>
 
 <script>
-import axios from 'axios';
-
 export default {
   name: 'TecnicoForm',
   props: {
@@ -80,10 +78,16 @@ export default {
     foto() { this.emitUpdate(); }
   },
   methods: {
-    async submitTecnico() {
-      try {
-        // Chiamata API al backend per registrare il tecnico
-        const response = await axios.post('http://localhost:3000/tecnici', {
+    submitTecnico() { // ATTENZIONE: Questa logica potrebbe essere ridondante
+      console.warn("TecnicoForm.submitTecnico() chiamato. È ancora necessario?");
+      // Verifica se tutti i campi richiesti sono validi prima di procedere
+      if (!this.specializzazione || !this.esperienza_anni || !this.tariffa_oraria || !this.disponibilita) {
+          console.error("Campi tecnico obbligatori mancanti.");
+          // Mostra un errore all'utente
+          return;
+      }
+
+      const payload = {
           specializzazione: this.specializzazione,
           esperienza_anni: this.esperienza_anni,
           tariffa_oraria: this.tariffa_oraria,
@@ -91,14 +95,44 @@ export default {
           note: this.note,
           certificazioni: this.certificazioni,
           foto: this.foto
-        }, { withCredentials: true });
-        
-        if (response.data.id) {
-          this.$router.push('/'); // o mostrare un messaggio di successo
-        }
-      } catch (error) {
-        console.error("Errore nella registrazione del tecnico:", error);
-      }
+      };
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'http://localhost:3000/tecnici', true); // Endpoint corretto?
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.withCredentials = true; // Serve autenticazione per creare un tecnico separatamente?
+
+      xhr.onload = () => {
+          try {
+             if (xhr.status >= 200 && xhr.status < 300) {
+                 const responseData = JSON.parse(xhr.responseText);
+                 if (responseData.id) {
+                     console.log("Tecnico creato/aggiornato(?) con ID:", responseData.id);
+                     // Decidi cosa fare: emettere evento, reindirizzare?
+                     // this.$router.push('/'); // Esempio reindirizzamento
+                     this.$emit('tecnicoSubmitted', responseData); // Esempio emissione evento
+                 } else {
+                      console.warn("Risposta successo da /tecnici ma senza ID:", responseData);
+                 }
+             } else {
+                  console.error("Errore HTTP submitTecnico:", xhr.status, xhr.statusText);
+                   const errorData = JSON.parse(xhr.responseText);
+                   console.error("Dettagli errore server:", errorData);
+                   // Mostra errore all'utente
+                   this.$emit('tecnicoError', errorData.error || 'Errore registrazione tecnico');
+             }
+          } catch(e) {
+               console.error("Errore parsing JSON submitTecnico:", e);
+               this.$emit('tecnicoError', 'Errore risposta server');
+          }
+      };
+
+      xhr.onerror = () => {
+          console.error('Errore di rete submitTecnico');
+          this.$emit('tecnicoError', 'Errore di rete');
+      };
+
+      xhr.send(JSON.stringify(payload));
     },
     emitUpdate() {
       this.$emit('update:modelValue', {

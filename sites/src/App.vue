@@ -22,15 +22,15 @@
           FAQ
         </v-btn>
 
-        <v-btn text rounded to="/utenti" class="mx-1" :disabled="!isAuthenticated || !canAccess('admin')">
+        <v-btn text rounded to="/utenti" class="mx-1" :disabled="!isAdmin"> <!-- Usa computed -->
           <v-icon left>mdi-account-group</v-icon>
           Utenti
         </v-btn>
-        <v-btn text rounded to="/cliente" class="mx-1" :disabled="!isAuthenticated || !canAccess('cliente')">
+        <v-btn text rounded to="/cliente" class="mx-1" :disabled="!isCliente"> <!-- Usa computed -->
           <v-icon left>mdi-account</v-icon>
           Cliente
         </v-btn>
-        <v-btn text rounded to="/tecnico" class="mx-1" :disabled="!isAuthenticated || !canAccess('tecnico')">
+        <v-btn text rounded to="/tecnico" class="mx-1" :disabled="!isTecnico"> <!-- Usa computed -->
           <v-icon left>mdi-wrench</v-icon>
           Tecnico
         </v-btn>
@@ -91,139 +91,279 @@ export default {
     return {
       userRole: null, // Initially null, fetched from the server
       isAuthenticated: false,
+      authCheckCompleted: false,
+      googleSignInInitialized: false,
     };
+  },
+  computed: {
+    isAdmin() {
+      return this.isAuthenticated && this.userRole === 'admin';
+    },
+    isCliente() {
+      return this.isAuthenticated && this.userRole === 'cliente';
+    },
+    isTecnico() {
+      return this.isAuthenticated && this.userRole === 'tecnico';
+    }
   },
   mounted() {
     this.checkAuthentication(); // Call on component mount
     this.initGoogleSignIn(); // Initialize Google Sign-In
   },
   methods: {
-    canAccess(role) {
-      return this.userRole === role;
-    },
-
-    updateUserRole() {
-      this.checkAuthentication();
-    },
-
     async checkAuthentication() {
+      console.log("App.vue: Esecuzione checkAuthentication iniziale...");
       try {
-        const response = await axios.get('http://localhost:3000/auth/check', { withCredentials: true });
-        if (response.data.authenticated) {
-          this.userRole = response.data.user.role;
-          this.isAuthenticated = true;
-        } else {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'http://localhost:3000/auth/check', true);
+        xhr.withCredentials = true;
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            console.log("App.vue: Risposta da /auth/check:", data);
+            if (data.authenticated) {
+              this.userRole = data.user.role;
+              this.isAuthenticated = true;
+              // Salva l'email se presente per il logout Google
+              if (data.user.email) {
+                localStorage.setItem('user_email', data.user.email);
+              }
+            } else {
+              this.userRole = null;
+              this.isAuthenticated = false;
+              localStorage.removeItem('user_email'); // Rimuovi se non autenticato
+            }
+          } else {
+            console.error("App.vue: Errore HTTP da /auth/check:", xhr.status, xhr.statusText);
+            this.userRole = null;
+            this.isAuthenticated = false;
+            localStorage.removeItem('user_email');
+          }
+          this.authCheckCompleted = true; // Segna il check come completato
+          console.log("App.vue: Stato Auth aggiornato:", { isAuthenticated: this.isAuthenticated, userRole: this.userRole });
+        };
+
+        xhr.onerror = () => {
+          console.error("App.vue: Errore di rete chiamando /auth/check");
           this.userRole = null;
           this.isAuthenticated = false;
-        }
-      }
-      catch (error) {
-        console.error("Error checking authentication:", error);
+          localStorage.removeItem('user_email');
+          this.authCheckCompleted = true; // Segna comunque come completato (fallito)
+        };
+
+        xhr.send();
+
+      } catch (error) {
+        // Questo catch potrebbe non catturare errori XHR asincroni, gestiti in onerror
+        console.error("App.vue: Errore imprevisto in checkAuthentication:", error);
         this.userRole = null;
         this.isAuthenticated = false;
+        localStorage.removeItem('user_email');
+        this.authCheckCompleted = true;
       }
     },
 
     async logout() {
+      console.log("App.vue: Esecuzione logout...");
       try {
-        await axios.get('http://localhost:3000/auth/logout', { withCredentials: true });
+        // Usiamo XMLHttpRequest
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'http://localhost:3000/auth/logout', true);
+        xhr.withCredentials = true;
 
-        // Optionally revoke Google token
-        if (window.google && window.google.accounts) {
-          window.google.accounts.id.revoke(localStorage.getItem('user_email') || '', () => {
-            console.log('Consent revoked');
-          });
-        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            console.log("App.vue: Logout backend riuscito.");
+            // Resetta stato locale IMMEDIATAMENTE
+            this.userRole = null;
+            this.isAuthenticated = false;
+            this.authCheckCompleted = true; // Lo stato è noto (non autenticato)
 
+            // Revoca Google e reindirizza
+            if (window.google && window.google.accounts && window.google.accounts.id) {
+              const userEmail = localStorage.getItem('user_email');
+              if (userEmail) {
+                console.log("App.vue: Revocazione consenso Google per", userEmail);
+                window.google.accounts.id.revoke(userEmail, () => {
+                  console.log('App.vue: Consenso Google revocato.');
+                  localStorage.removeItem('user_email');
+                  this.$router.push('/login'); // Reindirizza DOPO revoca
+                });
+              } else {
+                localStorage.removeItem('user_email'); // Sicurezza
+                this.$router.push('/login'); // Reindirizza se non c'era email Google
+              }
+            } else {
+              localStorage.removeItem('user_email'); // Sicurezza
+              this.$router.push('/login'); // Reindirizza se Google non è inizializzato
+            }
+          } else {
+            console.error("App.vue: Errore HTTP durante logout:", xhr.status, xhr.statusText);
+            // Potremmo voler resettare lo stato frontend comunque? Sì.
+            this.userRole = null;
+            this.isAuthenticated = false;
+            this.authCheckCompleted = true;
+            localStorage.removeItem('user_email');
+            this.$router.push('/login'); // Reindirizza comunque alla login
+          }
+        };
+
+        xhr.onerror = () => {
+          console.error("App.vue: Errore di rete durante logout.");
+          // Resetta lo stato frontend
+          this.userRole = null;
+          this.isAuthenticated = false;
+          this.authCheckCompleted = true;
+          localStorage.removeItem('user_email');
+          this.$router.push('/login'); // Reindirizza comunque
+        };
+
+        xhr.send();
+
+      } catch (error) {
+        console.error("App.vue: Errore imprevisto durante logout:", error);
+        // Resetta lo stato frontend
         this.userRole = null;
         this.isAuthenticated = false;
-        this.$router.push('/login');
-      } catch (error) {
-        console.error("Logout error:", error);
+        this.authCheckCompleted = true;
+        localStorage.removeItem('user_email');
+        this.$router.push('/login'); // Reindirizza comunque
       }
     },
 
     initGoogleSignIn() {
-      // Make sure the Google Identity Services script is loaded
-      if (window.google && window.google.accounts) {
+      if (this.googleSignInInitialized) return; // Inizializza solo una volta
+
+      console.log("App.vue: Tentativo inizializzazione Google Sign In...");
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        console.log("App.vue: Google API pronta. Inizializzazione...");
         this.renderGoogleButton();
+        this.googleSignInInitialized = true;
       } else {
-        // If not loaded yet, wait and try again
-        window.addEventListener('load', () => {
-          // Allow some time for the script to initialize
-          setTimeout(() => {
-            this.renderGoogleButton();
-          }, 100);
-        });
+        console.log("App.vue: Google API non ancora pronta. Aggiungo listener 'load'...");
+        // Aggiungi un listener all'evento 'load' della finestra
+        // Usa un flag per assicurarsi che venga aggiunto una sola volta
+        if (!window.googleApiLoadListenerAdded) {
+          window.addEventListener('load', this.tryRenderGoogleButtonAgain);
+          window.googleApiLoadListenerAdded = true; // Imposta il flag
+        }
+        // Aggiungi anche un timeout come fallback se 'load' fosse già passato
+        setTimeout(this.tryRenderGoogleButtonAgain, 1000);
+      }
+    },
+
+    tryRenderGoogleButtonAgain() {
+      if (this.googleSignInInitialized) return;
+      console.log("App.vue: Riprovo rendering pulsante Google (da load/timeout)...");
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        console.log("App.vue: Google API ora pronta.");
+        this.renderGoogleButton();
+        this.googleSignInInitialized = true;
+        // Rimuovi il listener se non serve più
+        window.removeEventListener('load', this.tryRenderGoogleButtonAgain);
+      } else {
+        console.log("App.vue: Google API ancora non pronta dopo il ritardo/load.");
+        // Potremmo voler riprovare dopo un altro timeout o loggare un errore persistente
       }
     },
 
     renderGoogleButton() {
-      if (!window.google || !window.google.accounts) {
-        console.error("Google Identity Services not loaded");
+      // Verifica che l'elemento esista nel DOM
+      const buttonContainer = this.$refs.googleButton;
+      if (!buttonContainer) {
+        console.error("App.vue: Elemento googleButton non trovato nel DOM.");
+        // Riprova dopo un breve ritardo se il componente non è ancora renderizzato completamente
+        setTimeout(this.renderGoogleButton, 100);
         return;
       }
+      // Pulisci il contenitore prima di renderizzare nuovamente (se necessario)
+      buttonContainer.innerHTML = '';
 
-      // Initialize Google Identity Services
-      window.google.accounts.id.initialize({
-        client_id: process.env.VUE_APP_GOOGLE_CLIENT_ID,
-        callback: this.handleCredentialResponse
-      });
+      try {
+        console.log("App.vue: Inizializzazione Google Accounts ID...");
+        window.google.accounts.id.initialize({
+          client_id: process.env.VUE_APP_GOOGLE_CLIENT_ID, // Assicurati sia definito nel .env del frontend
+          callback: this.handleCredentialResponse
+        });
 
-      // Render the button
-      window.google.accounts.id.renderButton(
-        this.$refs.googleButton,
-        {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'signin_with',
-          shape: 'rectangular'
-        }
-      );
+        console.log("App.vue: Rendering pulsante Google...");
+        window.google.accounts.id.renderButton(
+          buttonContainer, // Usa il ref all'elemento DOM
+          {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular'
+          }
+        );
 
-      // Optionally display the One Tap prompt
-      window.google.accounts.id.prompt();
+        // Optionally display the One Tap prompt
+        // window.google.accounts.id.prompt(); // Potrebbe essere fastidioso, commentalo se non desiderato
+        console.log("App.vue: Pulsante Google renderizzato.");
+      } catch (error) {
+        console.error("App.vue: Errore durante l'inizializzazione o rendering di Google Sign In:", error);
+      }
     },
 
     handleCredentialResponse(response) {
-      console.log("User signed in successfully");
-
-      // The response contains the JWT ID token
+      console.log("App.vue: Credenziale Google ricevuta.");
       const credential = response.credential;
-
-      // Decode the JWT payload (second part of the token)
-      const payload = JSON.parse(atob(credential.split('.')[1]));
-      const email = payload.email;
-      console.log("Email: ", email);
-
-      // Send the token to your server for verification
       this.verifyTokenWithServer(credential);
     },
 
     async verifyTokenWithServer(token) {
+      console.log("App.vue: Invio token Google al server...");
       try {
-        // Send the token to your backend to verify and create a session
-        const response = await axios.post('http://localhost:3000/auth/google',
-          { token },
-          { withCredentials: true }
-        );
+        // Usiamo XMLHttpRequest
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://localhost:3000/auth/google', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.withCredentials = true;
 
-        if (response.data.authenticated) {
-          this.userRole = response.data.user.role;
-          this.isAuthenticated = true;
-          // Redirect as needed
-          this.$router.push('/');
-        }
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            console.log("App.vue: Risposta verifica token server:", data);
+            if (data.authenticated) {
+              // Aggiorna stato locale IMMEDIATAMENTE
+              this.userRole = data.user.role;
+              this.isAuthenticated = true;
+              this.authCheckCompleted = true; // Lo stato è noto
+              if (data.user.email) {
+                localStorage.setItem('user_email', data.user.email);
+              }
+              console.log("App.vue: Login Google riuscito. Reindirizzamento...");
+              // Reindirizza alla home o alla dashboard appropriata
+              this.$router.push('/');
+            } else {
+              console.error("App.vue: Autenticazione Google fallita sul server:", data.error);
+              // Non aggiornare lo stato locale se fallisce
+              // Mostra un messaggio all'utente?
+            }
+          } else {
+            console.error("App.vue: Errore HTTP durante verifica token Google:", xhr.status, xhr.statusText);
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              console.error("Server error details:", errorData);
+              // Mostra errore specifico all'utente?
+            } catch (e) { /* ignore json parse error */ }
+          }
+        };
+
+        xhr.onerror = () => {
+          console.error("App.vue: Errore di rete durante verifica token Google.");
+        };
+
+        xhr.send(JSON.stringify({ token }));
+
       } catch (error) {
-        console.error("Error verifying token with server:", error);
+        console.error("App.vue: Errore imprevisto in verifyTokenWithServer:", error);
       }
     },
   },
   watch: {
-    '$route'() {
-      this.updateUserRole();
-    }
   }
 }
 </script>
