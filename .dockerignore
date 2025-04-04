@@ -2,3 +2,5 @@
 sites/.env
 node_modules
 sites/node_modules
+server/mock.db
+server/database.db

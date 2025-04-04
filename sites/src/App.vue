@@ -82,8 +82,6 @@
 </template>
 
 <script>
-import axios from 'axios'; // Import Axios
-
 export default {
   components: {
   },
