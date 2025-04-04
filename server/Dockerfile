@@ -3,6 +3,6 @@ WORKDIR /app
 COPY package*.json /app/
 RUN npm install
 COPY server/ /app/
-COPY swagger.js /app/    # Copia anche swagger.js
+COPY swagger.js /app/
 EXPOSE 3000
 CMD ["node", "server.js"]
