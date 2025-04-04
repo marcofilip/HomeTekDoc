@@ -223,8 +223,27 @@ export default {
             const data = JSON.parse(xhr.responseText);
             console.log("Fetched data (UtentiView): ", data);
             // Divisione utenti (logica invariata)
-            this.clientUsers = (data.utenti || []).filter(user => user.role === 'cliente').map(/*...*/);
-            this.technicianUsers = (data.utenti || []).filter(user => user.role === 'tecnico').map(/*...*/);
+            this.clientUsers = (data.utenti || [])
+              .filter(user => user.role === 'cliente')
+              .map(user => ({ // <-- Ripristina questa funzione
+                id: user.id,
+                nome: user.nome,
+                email: user.email,
+                citta: user.citta,
+                indirizzo: user.indirizzo,
+                role: user.role
+              }));
+
+            this.technicianUsers = (data.utenti || [])
+              .filter(user => user.role === 'tecnico')
+              .map(user => ({ // <-- Ripristina questa funzione
+                id: user.id,
+                nome: user.nome,
+                email: user.email,
+                citta: user.citta,
+                indirizzo: user.indirizzo,
+                role: user.role
+              }));
             // Mostra i clienti di default
             this.handleTabChange(this.activeTab); // Chiama handleTabChange per aggiornare this.users
           } else {
