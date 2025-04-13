@@ -5,7 +5,8 @@
         <h1 class="text-h3 text-center mb-6">Gestione Utenti</h1>
 
         <!-- Tabs for Users and Technicians -->
-        <v-tabs v-model="activeTab" centered class="mb-6" @change="handleTabChange">
+        <v-tabs v-model="activeTab" centered class="mb-6"
+          @update:modelValue="newValue => { console.log('v-tabs emitted:', newValue); handleTabChange(newValue); }">
           <v-tab>Utenti</v-tab>
           <v-tab>Tecnici</v-tab>
         </v-tabs>
@@ -289,16 +290,16 @@ export default {
               const detail = (data.tecnici || []).find(dt => dt.auth_user_id === baseTech.id);
               return detail ? { ...baseTech, ...detail } : baseTech;
             });
-            this.users = mergedTechnicians; // Aggiorna la lista visualizzata
+            this.technicians = mergedTechnicians; // Aggiorna la lista visualizzata
           } else {
             console.error("Errore HTTP loadTechnicians:", xhr.status, xhr.statusText);
             this.showSnackbar('Errore nel caricamento dei tecnici', 'error');
-            this.users = [];
+            this.technicians = [];
           }
         } catch (e) {
           console.error("Errore parsing JSON loadTechnicians:", e);
           this.showSnackbar('Errore nella risposta del server (tecnici)', 'error');
-          this.users = [];
+          this.technicians = [];
         } finally {
           this.loadingTechnicians = false;
         }

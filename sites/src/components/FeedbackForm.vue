@@ -46,6 +46,10 @@ export default {
     technicianName: {
       type: String,
       required: true
+    },
+    assistenzaId: {
+      type: Number,
+      required: true // Richiesto per legare il feedback
     }
   },
   data() {
@@ -72,7 +76,8 @@ export default {
       const payload = {
         technician_id: this.technicianId,
         rating: this.rating,
-        comment: this.comment
+        comment: this.comment,
+        assistenza_id: this.assistenzaId // Aggiunto ID assistenza
       };
 
       const xhr = new XMLHttpRequest();

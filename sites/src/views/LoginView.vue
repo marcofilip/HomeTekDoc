@@ -82,6 +82,19 @@ export default {
             const data = JSON.parse(xhr.responseText);
             if (xhr.status === 200) {
               this.showSnackbarMessage('Login successful!', 'success');
+
+              if (this.$root && typeof this.$root.updateAuthStatus === 'function') {
+                this.$root.updateAuthStatus(true, data.user.role);
+                // Salva email per logout Google
+                if (data.user.email) {
+                  localStorage.setItem('user_email', data.user.email);
+                }
+              } else {
+                console.warn("Impossibile chiamare updateAuthStatus su $root. Ricaricamento forzato.");
+                window.location.reload(); // Fallback al reload
+                return;
+              }
+
               setTimeout(() => {
                 const redirect = {
                   admin: '/utenti',

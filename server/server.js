@@ -13,7 +13,6 @@ const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.VUE_APP_GOOGLE_CLIENT_ID);
 const tecnicoDb = require("./tecnicoDb");
 const feedbackRouterFactory = require("./feedback");
-const feedbackRouter = require("./feedback");
 const NodeGeocoder = require('node-geocoder');
 
 const geocoder = NodeGeocoder({
@@ -88,6 +87,14 @@ const auth = (req, res, next) => {
   return res.status(401).json({ error: "Unauthorized" });
 };
 
+// Middleware specifico per verificare se l'utente è un tecnico
+const isTechnician = (req, res, next) => {
+  if (req.session.user && req.session.user.role === 'tecnico') {
+    return next();
+  }
+  return res.status(403).json({ error: "Forbidden: Access restricted to technicians" });
+};
+
 // Uncomment the following line to use the actual database
 // const dbPath = path.join(__dirname, "database.db");
 
@@ -101,69 +108,6 @@ const db = require('./mock');
 //   if (err) return console.error("Database connection error:", err.message);
 //   console.log("Connected to SQLite database at:", dbPath);
 // });
-
-db.run(
-  `CREATE TABLE IF NOT EXISTS auth_users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    nome TEXT NOT NULL,
-    email TEXT NOT NULL,
-    citta TEXT NOT NULL,
-    indirizzo TEXT NOT NULL,
-    telefono TEXT NOT NULL,
-    role TEXT CHECK(role IN ('cliente', 'tecnico', 'admin')) NOT NULL
-  )`,
-  (err) => {
-    if (err) {
-      console.error("Error creating auth_users table:", err);
-    } else {
-      console.log("auth_users table is ready");
-      db.get(
-        "SELECT * FROM auth_users WHERE username = 'admin'",
-        [],
-        (err, row) => {
-          if (err) {
-            console.error("Error checking admin user:", err);
-          } else if (!row) {
-            db.run(
-              `INSERT INTO auth_users (username, password, nome, email, citta, indirizzo, telefono, role) 
-                       VALUES ('admin', 'GreatestAdmin3v3r', 'Admin', 'admin@gmail.com', 'AdminLandia', 'Administrator', '0000000000', 'admin')`,
-              (err) => {
-                if (err) {
-                  console.error("Error creating admin user:", err);
-                } else {
-                  console.log("Admin user created successfully");
-                }
-              }
-            );
-          }
-        }
-      );
-    }
-  }
-);
-
-db.run(
-  `
-  CREATE TABLE IF NOT EXISTS assistenza (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER NOT NULL,
-    description TEXT,
-    urgente INTEGER DEFAULT 0, -- 0: non urgente, 1: urgente
-    status TEXT DEFAULT 'in attesa',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (customer_id) REFERENCES auth_users(id) ON DELETE CASCADE
-  )
-`,
-  (err) => {
-    if (err) {
-      console.error("Error creating assistenza table:", err);
-    } else {
-      console.log("Assistenza table is ready");
-    }
-  }
-);
 
 app.post("/auth/register", (req, res) => {
   console.log("Received registration request:", req.body);
@@ -758,59 +702,173 @@ app.delete("/tecnici/:id", auth, (req, res) => {
 });
 
 app.post("/assistenza", auth, (req, res) => {
-  const { description, urgente } = req.body;
+  const { description, urgente, technician_id, title } = req.body;
   const customer_id = req.session.user.id;
 
-  if (!description) {
-    return res.status(400).json({ error: "La descrizione è obbligatoria" });
+  if (!description || !technician_id || !title) {
+    return res.status(400).json({ error: "Descrizione, ID tecnico e titolo sono obbligatori" });
+  }
+  if (isNaN(Number(technician_id))) {
+    return res.status(400).json({ error: "ID tecnico non valido" });
   }
 
   const query = `
-    INSERT INTO assistenza (customer_id, description, urgente)
-    VALUES (?, ?, ?)
+    INSERT INTO assistenza (customer_id, description, urgente, technician_id, title)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
-  // urgente deve essere 1 se true, altrimenti 0
   const urgFlag = urgente ? 1 : 0;
-  db.run(query, [customer_id, description, urgFlag], function (err) {
+  db.run(query, [customer_id, description, urgFlag, Number(technician_id), title], function (err) {
     if (err) {
       console.error("Error inserting assistenza request:", err);
-      return res.status(500).json({ error: err.message });
+      if (err.message.includes("FOREIGN KEY constraint failed")) {
+        return res.status(400).json({ error: "ID Tecnico specificato non valido." });
+      }
+      return res.status(500).json({ error: "Errore nell'invio della richiesta: " + err.message });
     }
-    // Se la richiesta è urgente, puoi eventualmente attivare un meccanismo di notifica
-    res.json({
+    res.status(201).json({
       message: "Richiesta di assistenza inviata con successo",
-      richiestaId: this.lastID,
-      urgente: urgFlag,
+      richiestaId: this.lastID
     });
   });
 });
 
 app.get('/assistenze', auth, (req, res) => {
-  const customer_id = req.session.user?.id; // Usa optional chaining
+  const customer_id = req.session.user?.id;
   if (!customer_id) {
-      // Anche se 'auth' dovrebbe prevenire questo, è una doppia sicurezza
-      return res.status(401).json({ error: 'Autenticazione richiesta o ID utente non trovato in sessione' });
+    return res.status(401).json({ error: 'Autenticazione richiesta o ID utente non trovato in sessione' });
   }
 
   const query = `
-      SELECT id, description, urgente, status, created_at
-      FROM assistenza
-      WHERE customer_id = ?
-      ORDER BY created_at DESC
+      SELECT
+          a.id, a.title, a.description, a.urgente, a.status, a.created_at,
+          a.technician_id,
+          u_tech.nome AS technician_name,
+          (f.id IS NOT NULL) AS feedbackSent -- Verifica se esiste un feedback collegato
+      FROM assistenza a
+      LEFT JOIN technicians t ON a.technician_id = t.id
+      LEFT JOIN auth_users u_tech ON t.auth_user_id = u_tech.id
+      LEFT JOIN feedback f ON a.id = f.assistenza_id -- LEFT JOIN con feedback tramite assistenza_id
+      WHERE a.customer_id = ?
+      ORDER BY a.created_at DESC
   `;
 
   db.all(query, [customer_id], (err, rows) => {
+    if (err) {
+      console.error("Error fetching assistenze:", err);
+      return res.status(500).json({ error: "Errore nel recupero delle richieste di assistenza." });
+    }
+    const assistenze = rows.map(a => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      urgente: Boolean(a.urgente),
+      status: a.status,
+      created_at: new Date(a.created_at).toLocaleString(),
+      technician_id: a.technician_id,
+      technician_name: a.technician_name || 'N/D',
+      feedbackSent: Boolean(a.feedbackSent) // Converte 0/1 in false/true
+    }));
+    res.json({ assistenze: assistenze });
+  });
+});
+
+// NUOVO Endpoint: GET /tecnici/me/assistenze
+app.get('/tecnici/me/assistenze', auth, isTechnician, (req, res) => {
+  const auth_user_id = req.session.user.id;
+
+  db.get("SELECT id FROM technicians WHERE auth_user_id = ?", [auth_user_id], (err, technicianProfile) => {
+    if (err) {
+      console.error("Error finding technician profile:", err);
+      return res.status(500).json({ error: "Errore nel trovare il profilo tecnico." });
+    }
+    if (!technicianProfile) {
+      console.error(`No technician profile found for auth_user_id: ${auth_user_id}`);
+      return res.status(404).json({ error: "Profilo tecnico non trovato per l'utente corrente." });
+    }
+
+    const technician_id = technicianProfile.id;
+
+    const query = `
+        SELECT
+            a.id, a.title, a.description, a.urgente, a.status, a.created_at,
+            a.customer_id,
+            u_cli.nome AS customer_name,
+            u_cli.telefono AS customer_phone,
+            u_cli.indirizzo AS customer_address,
+            u_cli.citta AS customer_city
+        FROM assistenza a
+        JOIN auth_users u_cli ON a.customer_id = u_cli.id
+        WHERE a.technician_id = ?
+        ORDER BY a.created_at DESC
+    `;
+
+    db.all(query, [technician_id], (err, rows) => {
       if (err) {
-          console.error("Error fetching assistenze:", err);
-          return res.status(500).json({ error: "Errore nel recupero delle richieste di assistenza." });
+        console.error("Error fetching assigned assistenze:", err);
+        return res.status(500).json({ error: "Errore nel recupero delle richieste di assistenza assegnate." });
       }
-      const assistenze = rows.map(a => ({
-          ...a,
-          created_at: new Date(a.created_at).toLocaleString(), // Formattazione data
-          urgente: Boolean(a.urgente) // Converte 0/1 in false/true
+      const assignedAssistenze = rows.map(a => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        urgente: Boolean(a.urgente),
+        status: a.status,
+        created_at: new Date(a.created_at).toLocaleString(),
+        customer_id: a.customer_id,
+        customer_name: a.customer_name || 'N/D',
+        customer_phone: a.customer_phone || 'N/D',
+        customer_address: a.customer_address || 'N/D',
+        customer_city: a.customer_city || 'N/D'
       }));
-      res.json({ assistenze: assistenze });
+      res.json({ assistenze: assignedAssistenze });
+    });
+  });
+});
+
+// NUOVO Endpoint: PUT /assistenze/:id/status
+app.put('/assistenze/:id/status', auth, isTechnician, (req, res) => {
+  const assistenzaId = req.params.id;
+  const newStatus = req.body.status;
+  const auth_user_id = req.session.user.id;
+  const allowedStatuses = ['in corso', 'completato', 'annullata'];
+
+  if (!assistenzaId || isNaN(Number(assistenzaId))) {
+      return res.status(400).json({ error: "ID richiesta non valido." });
+  }
+  if (!newStatus || !allowedStatuses.includes(newStatus)) {
+    return res.status(400).json({ error: `Stato non valido. Stati permessi: ${allowedStatuses.join(', ')}` });
+  }
+
+  db.get("SELECT id FROM technicians WHERE auth_user_id = ?", [auth_user_id], (err, technicianProfile) => {
+    if (err) {
+      console.error("Error finding technician profile for status update:", err);
+      return res.status(500).json({ error: "Errore nel trovare il profilo tecnico." });
+    }
+    if (!technicianProfile) {
+      return res.status(404).json({ error: "Profilo tecnico non trovato per l'utente corrente." });
+    }
+
+    const technician_id = technicianProfile.id;
+
+    const updateQuery = `
+        UPDATE assistenza
+        SET status = ?
+        WHERE id = ? AND technician_id = ?
+    `;
+
+    db.run(updateQuery, [newStatus, Number(assistenzaId), technician_id], function(err) {
+      if (err) {
+        console.error("Error updating assistenza status:", err);
+        return res.status(500).json({ error: "Errore nell'aggiornamento dello stato." });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: "Richiesta non trovata o non assegnata a questo tecnico." });
+      }
+
+      res.json({ message: `Stato della richiesta ${assistenzaId} aggiornato a \"${newStatus}\" con successo.` });
+    });
   });
 });
 
@@ -838,7 +896,6 @@ app.get("/geocode", (req, res) => {
     });
 });
 
-app.use("/", feedbackRouter);
 app.use("/api", exampleRouter);
 app.use('/', feedbackRouterFactory(db));
 

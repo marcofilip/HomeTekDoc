@@ -360,6 +360,12 @@ export default {
         console.error("App.vue: Errore imprevisto in verifyTokenWithServer:", error);
       }
     },
+    updateAuthStatus(status, role) {
+      this.isAuthenticated = status;
+      this.userRole = role;
+      this.authCheckCompleted = true; // Segna come completato
+      console.log("App.vue: Stato Auth aggiornato manualmente:", { isAuthenticated: this.isAuthenticated, userRole: this.userRole });
+    }
   },
   watch: {
   }

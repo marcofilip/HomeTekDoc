@@ -13,20 +13,22 @@
         </v-btn>
       </v-card-title>
       <v-card-text>
+        <!-- AGGIORNAMENTO: Aggiunta colonna Titolo e Nome Tecnico -->
         <v-data-table :headers="assistenzeHeaders" :items="assistenze" :loading="loadingAssistenze" class="elevation-1">
           <template v-slot:[`item.status`]="{ item }">
-            <v-chip :color="getStatusColor(item.status)" small>
-              {{ item.status }}
+            <v-chip :color="getStatusColor(item.raw.status)" small>
+              {{ item.raw.status }}
             </v-chip>
           </template>
           <template v-slot:[`item.urgente`]="{ item }">
-            <v-icon v-if="item.urgente" color="red">mdi-alert</v-icon>
+            <v-icon v-if="item.raw.urgente" color="red">mdi-alert</v-icon>
             <v-icon v-else>mdi-check</v-icon>
           </template>
           <template v-slot:[`item.actions`]="{ item }">
-            <v-btn small color="primary" text @click="openFeedbackDialog(item)"
-              :disabled="item.status !== 'completata' || item.feedbackSent">
-              {{ item.feedbackSent ? 'Feedback inviato' : 'Lascia feedback' }}
+             <!-- Passiamo item.raw che contiene l'oggetto completo -->
+            <v-btn small color="primary" text @click="openFeedbackDialog(item.raw)"
+              :disabled="item.raw.status !== 'completato' || item.raw.feedbackSent">
+              {{ item.raw.feedbackSent ? 'Feedback inviato' : 'Lascia feedback' }}
             </v-btn>
           </template>
           <template v-slot:no-data>
@@ -116,6 +118,7 @@
                 <p v-if="tech.note" class="mt-2 font-italic">{{ tech.note }}</p>
               </v-card-text>
               <v-card-actions>
+                 <!-- Passa l'intero oggetto tech -->
                 <v-btn text color="primary" block @click="openAssistanceDialog(tech)">
                   <v-icon left>mdi-account-wrench</v-icon>
                   Richiedi Assistenza
@@ -132,18 +135,35 @@
 
     <!-- Dialog per il feedback -->
     <v-dialog v-model="feedbackDialog" max-width="500px">
-      <FeedbackForm :technicianId="selectedAssistenza.technician_id" :technicianName="selectedAssistenza.technicianName"
+      <!-- Assicurati che selectedAssistenza abbia technician_id e technician_name -->
+      <FeedbackForm v-if="selectedAssistenza.technician_id"
+        :technicianId="selectedAssistenza.technician_id"
+        :technicianName="selectedAssistenza.technician_name || 'Tecnico'"
         @feedbackSent="handleFeedbackSent" />
+       <v-card v-else>
+           <v-card-text>Dati tecnico mancanti per il feedback.</v-card-text>
+       </v-card>
     </v-dialog>
 
     <!-- Dialog per la richiesta di assistenza -->
     <v-dialog v-model="assistanceDialog" max-width="500px">
-      <v-card>
+      <v-card v-if="selectedTechnician.id"> <!-- Aggiunto v-if per sicurezza -->
         <v-card-title>Richiesta di Assistenza</v-card-title>
         <v-card-text>
           <v-form ref="assistanceForm" v-model="assistanceFormValid">
             <p class="mb-4">Stai richiedendo assistenza a: <strong>{{ selectedTechnician.nome }}</strong> ({{
               selectedTechnician.specializzazione }})</p>
+
+            <!-- NUOVO CAMPO TITOLO -->
+            <v-text-field
+              v-model="assistanceTitle"
+              label="Titolo Richiesta"
+              :rules="[v => !!v || 'Titolo obbligatorio']"
+              required
+              outlined
+              class="mb-4"
+            ></v-text-field>
+            <!-- FINE NUOVO CAMPO TITOLO -->
 
             <v-textarea v-model="assistanceDescription" label="Descrivi il problema"
               :rules="[v => !!v || 'Descrizione obbligatoria']" required rows="4" outlined></v-textarea>
@@ -195,31 +215,31 @@ export default {
       loading: false,
       error: null,
 
-      // Nuovi dati per le assistenze e i feedback
       assistenze: [],
       loadingAssistenze: false,
+      // AGGIORNAMENTO HEADERS TABELLA ASSISTENZE
       assistenzeHeaders: [
-        { text: 'Data', value: 'created_at' },
-        { text: 'Descrizione', value: 'description' },
-        { text: 'Urgente', value: 'urgente' },
-        { text: 'Stato', value: 'status' },
-        { text: 'Tecnico', value: 'technicianName' },
-        { text: 'Azioni', value: 'actions', sortable: false }
+        { title: 'Data', key: 'created_at', sortable: true },
+        { title: 'Titolo', key: 'title', sortable: true }, // Aggiunto Titolo
+        { title: 'Tecnico', key: 'technician_name', sortable: true }, // Aggiunto Tecnico
+        { title: 'Urgente', key: 'urgente', sortable: false },
+        { title: 'Stato', key: 'status', sortable: true },
+        { title: 'Azioni', key: 'actions', sortable: false }
+        // Rimosso descrizione per brevità, può essere in un dettaglio
       ],
+      // FINE AGGIORNAMENTO HEADERS
 
-      // Per il dialog di feedback
       feedbackDialog: false,
-      selectedAssistenza: {},
+      selectedAssistenza: {}, // Conterrà l'oggetto assistenza completo
 
-      // Per il dialog di richiesta assistenza
       assistanceDialog: false,
-      selectedTechnician: {},
+      selectedTechnician: {}, // Conterrà l'oggetto tecnico completo
+      assistanceTitle: '', // NUOVO: v-model per il titolo
       assistanceDescription: '',
       assistanceUrgent: false,
       assistanceFormValid: false,
       assistanceLoading: false,
 
-      // Per le notifiche
       snackbar: {
         show: false,
         text: '',
@@ -303,13 +323,8 @@ export default {
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
             const data = JSON.parse(xhr.responseText);
-            this.assistenze = (data.assistenze || []).map(a => ({ // Aggiunto controllo || []
-              ...a,
-              // La formattazione della data è già gestita correttamente dal backend
-              // created_at: new Date(a.created_at).toLocaleString(),
-              urgente: Boolean(a.urgente),
-              // feedbackSent: Boolean(a.feedback_id) // Questo campo manca nella risposta API attuale
-            }));
+             // AGGIORNAMENTO: ora riceviamo technician_id e technician_name
+            this.assistenze = data.assistenze || []; // Il backend già mappa bene
           } else {
             console.error('Errore HTTP fetchAssistenze:', xhr.status, xhr.statusText);
             this.showSnackbar('Impossibile caricare le assistenze', 'error');
@@ -323,14 +338,12 @@ export default {
           this.loadingAssistenze = false;
         }
       };
-
       xhr.onerror = () => {
-        console.error('Errore di rete fetchAssistenze');
-        this.showSnackbar('Errore di rete nel caricamento delle assistenze', 'error');
-        this.assistenze = [];
-        this.loadingAssistenze = false;
-      };
-
+         console.error('Errore di rete fetchAssistenze');
+         this.showSnackbar('Errore di rete nel caricamento delle assistenze', 'error');
+         this.assistenze = [];
+         this.loadingAssistenze = false;
+       };
       xhr.send();
     },
 
@@ -394,11 +407,14 @@ export default {
       if (!this.$refs.assistanceForm.validate()) return;
 
       this.assistanceLoading = true;
+      // AGGIORNAMENTO PAYLOAD
       const payload = {
           description: this.assistanceDescription,
           urgente: this.assistanceUrgent,
-          // technician_id: this.selectedTechnician.id // Importante: l'endpoint POST /assistenza attuale non sembra usare technician_id! Lo rimuoviamo per ora.
+          technician_id: this.selectedTechnician.id, // Assicurati che l'ID sia corretto
+          title: this.assistanceTitle // Aggiunto titolo
       };
+      // FINE AGGIORNAMENTO PAYLOAD
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', 'http://localhost:3000/assistenza', true);
@@ -407,16 +423,17 @@ export default {
 
       xhr.onload = () => {
          try {
-            if (xhr.status >= 200 && xhr.status < 300) {
+            if (xhr.status >= 200 && xhr.status < 300) { // Controlla anche 201
                 const responseData = JSON.parse(xhr.responseText);
                 this.showSnackbar(responseData.message || 'Richiesta inviata con successo', 'success');
 
-                // Apri mailto (logica invariata)
-                const mailtoUrl = `mailto:${this.selectedTechnician.email}?subject=Richiesta assistenza tecnica&body=Salve ${this.selectedTechnician.nome},%0D%0A%0D%0ASono un cliente HomeTekDoc e vorrei richiedere la sua assistenza per:%0D%0A%0D%0A${encodeURIComponent(this.assistanceDescription)}%0D%0A%0D%0ATipo di assistenza: ${this.assistanceUrgent ? 'Urgente' : 'Standard'}%0D%0AIndirizzo: [Il mio indirizzo]%0D%0ADisponibilità: [Indicare quando si è disponibili]%0D%0A%0D%0AGrazie,%0D%0A[Il tuo nome]`;
+                // AGGIORNAMENTO MAILTO: Includi il titolo
+                const mailtoUrl = `mailto:${this.selectedTechnician.email}?subject=${encodeURIComponent(this.assistanceTitle)}&body=Salve ${this.selectedTechnician.nome},%0D%0A%0D%0ASono un cliente HomeTekDoc e vorrei richiedere la sua assistenza per:%0D%0A${encodeURIComponent(this.assistanceTitle)}%0D%0A%0D%0A${encodeURIComponent(this.assistanceDescription)}%0D%0A%0D%0ATipo di assistenza: ${this.assistanceUrgent ? 'Urgente' : 'Standard'}%0D%0A%0D%0AGrazie,%0D%0A[Il tuo nome]`;
                 window.location.href = mailtoUrl;
+                // FINE AGGIORNAMENTO MAILTO
 
                 this.assistanceDialog = false;
-                this.fetchAssistenze(); // Aggiorna la lista
+                this.fetchAssistenze();
             } else {
                  console.error("Errore HTTP submitAssistanceRequest:", xhr.status, xhr.statusText);
                  const errorData = JSON.parse(xhr.responseText);
@@ -429,13 +446,11 @@ export default {
               this.assistanceLoading = false;
          }
       };
-
       xhr.onerror = () => {
           console.error('Errore di rete submitAssistanceRequest');
           this.showSnackbar('Errore di rete nell\'invio della richiesta', 'error');
           this.assistanceLoading = false;
       };
-
       xhr.send(JSON.stringify(payload));
     },
 
@@ -452,7 +467,7 @@ export default {
     },
 
     openFeedbackDialog(assistenza) {
-      this.selectedAssistenza = assistenza;
+      this.selectedAssistenza = { ...assistenza }; // Copia per evitare mutazioni accidentali
       this.feedbackDialog = true;
     },
 
@@ -460,18 +475,25 @@ export default {
       this.feedbackDialog = false;
       if (result.success) {
         this.showSnackbar('Feedback inviato con successo', 'success');
-        this.fetchAssistenze(); // Aggiorna la lista
+        this.fetchAssistenze();
       } else {
         this.showSnackbar(result.message || 'Errore nell\'invio del feedback', 'error');
       }
     },
 
     // Nuovo metodo per aprire il dialog di richiesta assistenza
+    // AGGIORNAMENTO: Passa l'intero oggetto tecnico
     openAssistanceDialog(technician) {
-      this.selectedTechnician = technician;
+      this.selectedTechnician = { ...technician }; // Copia
+      this.assistanceTitle = ''; // Resetta titolo
       this.assistanceDescription = '';
       this.assistanceUrgent = false;
       this.assistanceDialog = true;
+      this.$nextTick(() => { // Assicura che il form sia nel DOM prima di resettare la validazione
+           if (this.$refs.assistanceForm) {
+              this.$refs.assistanceForm.resetValidation();
+           }
+      });
     },
 
     showSnackbar(text, color) {

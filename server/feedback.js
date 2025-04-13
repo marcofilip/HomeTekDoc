@@ -8,14 +8,19 @@ module.exports = function (dbConnection) { // Funzione che accetta db
 
   // Endpoint per inviare un feedback
   router.post("/feedback", (req, res) => {
-    const { technician_id, rating, comment } = req.body;
-    const customer_id = req.session && req.session.user ? req.session.user.id : null; // Assicurati che auth middleware sia usato prima di questo router in server.js
+    // Aggiungi assistenza_id al destructuring
+    const { technician_id, rating, comment, assistenza_id } = req.body;
+    const customer_id = req.session?.user?.id; // Usa optional chaining
 
     if (!customer_id) {
       return res.status(401).json({ error: "Autenticazione richiesta" });
     }
-    if (!technician_id || !rating) {
-      return res.status(400).json({ error: "Technician ID e rating sono obbligatori" });
+    // Aggiungi controllo per assistenza_id
+    if (!technician_id || !rating || !assistenza_id) {
+      return res.status(400).json({ error: "Technician ID, rating e ID assistenza sono obbligatori" });
+    }
+    if (isNaN(Number(assistenza_id))) {
+         return res.status(400).json({ error: "ID assistenza non valido" });
     }
 
     // Validazione aggiuntiva per rating
@@ -24,14 +29,19 @@ module.exports = function (dbConnection) { // Funzione che accetta db
          return res.status(400).json({ error: "Rating deve essere un numero tra 1 e 5" });
     }
 
+    // Query aggiornata per includere assistenza_id
     const query = `
-      INSERT INTO feedback (technician_id, customer_id, rating, comment)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO feedback (technician_id, customer_id, rating, comment, assistenza_id)
+      VALUES (?, ?, ?, ?, ?)
     `;
-    dbConnection.run(query, [technician_id, customer_id, numRating, comment || ''], function(err) { // Usa dbConnection
+    // Parametri aggiornati
+    dbConnection.run(query, [technician_id, customer_id, numRating, comment || '', Number(assistenza_id)], function(err) {
       if (err) {
         console.error("Errore nell'inserimento del feedback:", err);
-        // Potrebbe fallire per FOREIGN KEY constraint se technician_id o customer_id non validi
+        if (err.message.includes("FOREIGN KEY constraint failed")) {
+            // Può fallire per technician_id, customer_id o assistenza_id non validi
+            return res.status(400).json({ error: "ID Tecnico, Cliente o Assistenza non validi." });
+        }
         return res.status(500).json({ error: "Impossibile salvare il feedback: " + err.message });
       }
       res.status(201).json({ message: "Feedback inviato con successo", feedbackId: this.lastID });
@@ -46,20 +56,28 @@ module.exports = function (dbConnection) { // Funzione che accetta db
          return res.status(400).json({ error: "Technician ID non valido" });
      }
 
-    // Query per recuperare anche il nome del cliente
+    // Query per recuperare anche il nome del cliente e il titolo assistenza
     const query = `
-      SELECT f.id, f.technician_id, f.customer_id, f.rating, f.comment, f.timestamp, u.nome as customer_name
+      SELECT f.id, f.technician_id, f.customer_id, f.rating, f.comment, f.timestamp,
+             u.nome as customer_name,
+             a.title as assistenza_title -- Aggiunto titolo assistenza
       FROM feedback f
       JOIN auth_users u ON f.customer_id = u.id
+      LEFT JOIN assistenza a ON f.assistenza_id = a.id -- LEFT JOIN nel caso assistenza_id sia NULL
       WHERE f.technician_id = ?
       ORDER BY f.timestamp DESC
     `;
-    dbConnection.all(query, [technicianId], (err, rows) => { // Usa dbConnection
+    dbConnection.all(query, [technicianId], (err, rows) => {
       if (err) {
         console.error("Errore nel recupero dei feedback:", err);
         return res.status(500).json({ error: err.message });
       }
-      res.json({ feedback: rows });
+      // Mappa anche il titolo assistenza se presente
+      const feedbackList = rows.map(row => ({
+            ...row,
+            assistenza_title: row.assistenza_title || 'N/A'
+      }));
+      res.json({ feedback: feedbackList });
     });
   });
 

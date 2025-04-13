@@ -5,7 +5,7 @@ import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
 import UtentiView from "../views/UtentiView.vue";
 import ClienteView from "../views/ClienteView.vue";
-import TecnicoView from "../views/TecnicoView.vue";
+import TechnicianDashboardView from "../views/TechnicianDashboardView.vue"; // NUOVO IMPORT
 import ChatView from "../views/ChatView.vue";
 import AboutView from "../views/AboutView.vue";
 // Rimosso: import axios from "axios"; // Non più necessario qui
@@ -35,7 +35,6 @@ const routes = [
     path: "/utenti",
     name: "utenti",
     component: UtentiView,
-    // Le meta informazioni rimangono utili per il futuro o per logica nel componente
     meta: { requiresAuth: true, requiredRole: "admin" },
   },
   {
@@ -47,14 +46,14 @@ const routes = [
   {
     path: "/tecnico",
     name: "tecnico",
-    component: TecnicoView,
+    component: TechnicianDashboardView, // Punta alla nuova dashboard
     meta: { requiresAuth: true, requiredRole: "tecnico" },
   },
   {
     path: "/chat",
     name: "chat",
     component: ChatView,
-    // Aggiungere meta se necessario, es: { requiresAuth: true }
+    meta: { requiresAuth: true }, // Richiede login per chattare?
   },
   {
     path: "/faq",
@@ -68,18 +67,9 @@ const router = createRouter({
   routes,
 });
 
-// --- INIZIO MODIFICA ---
-// La vecchia logica con la chiamata API è stata rimossa.
-// Per la modalità sviluppo, permettiamo tutte le navigazioni.
-// La protezione vera avverrà a livello API nel backend e tramite
-// l'abilitazione/disabilitazione dei link/pulsanti in App.vue.
 router.beforeEach((to, from, next) => {
   console.log(`Router Guard: Navigating from ${from.path} to ${to.path}.`);
-  // In futuro, qui si leggerà lo stato da Pinia/Vuex per decidere se
-  // permettere (next()), reindirizzare a login (next('/login')),
-  // o reindirizzare altrove (next('/forbidden')).
-  next(); // Permette sempre la navigazione
+  next();
 });
-// --- FINE MODIFICA ---
 
 export default router;
