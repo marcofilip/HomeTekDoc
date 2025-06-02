@@ -113,7 +113,7 @@ export default {
       console.log("App.vue: Esecuzione checkAuthentication iniziale...");
       try {
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', 'http://localhost:3000/auth/check', true);
+        xhr.open('GET', '/auth/check', true);
         xhr.withCredentials = true;
 
         xhr.onload = () => {
@@ -167,7 +167,7 @@ export default {
       try {
         // Usiamo XMLHttpRequest
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', 'http://localhost:3000/auth/logout', true);
+        xhr.open('GET', '/auth/logout', true);
         xhr.withCredentials = true;
 
         xhr.onload = () => {
@@ -316,7 +316,7 @@ export default {
       try {
         // Usiamo XMLHttpRequest
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:3000/auth/google', true);
+        xhr.open('POST', '/auth/google', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.withCredentials = true;
 

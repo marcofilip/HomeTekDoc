@@ -212,7 +212,7 @@ export default {
         }
 
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:3000/auth/register', true);
+        xhr.open('POST', '/auth/register', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.withCredentials = true;
 

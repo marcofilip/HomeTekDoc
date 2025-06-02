@@ -215,7 +215,7 @@ export default {
     loadUsers() {
       this.loadingUsers = true;
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', 'http://localhost:3000/utenti', true);
+      xhr.open('GET', '/utenti', true);
       xhr.withCredentials = true;
 
       xhr.onload = () => {
@@ -277,7 +277,7 @@ export default {
     loadTechnicians() {
       this.loadingTechnicians = true;
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', 'http://localhost:3000/tecnici', true);
+      xhr.open('GET', '/tecnici', true);
       xhr.withCredentials = true;
 
       xhr.onload = () => {
@@ -323,7 +323,7 @@ export default {
     deleteUser() {
       console.log('Deleting user with ID:', this.userToDelete);
       const xhr = new XMLHttpRequest();
-      xhr.open('DELETE', `http://localhost:3000/utenti/${this.userToDelete}`, true);
+      xhr.open('DELETE', `/utenti/${this.userToDelete}`, true);
       xhr.withCredentials = true;
 
       xhr.onload = () => {
@@ -368,7 +368,7 @@ export default {
 
     deleteTechnicianConfirmed() {
       const xhr = new XMLHttpRequest();
-      xhr.open('DELETE', `http://localhost:3000/tecnici/${this.technicianToDelete}`, true);
+      xhr.open('DELETE', `/tecnici/${this.technicianToDelete}`, true);
       xhr.withCredentials = true;
 
       xhr.onload = () => {
@@ -416,7 +416,7 @@ export default {
       };
 
       const xhr = new XMLHttpRequest();
-      xhr.open('PUT', `http://localhost:3000/utenti/${this.editUserData.id}`, true);
+      xhr.open('PUT', `/utenti/${this.editUserData.id}`, true);
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.withCredentials = true;
 

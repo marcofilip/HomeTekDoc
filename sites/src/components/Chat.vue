@@ -29,7 +29,7 @@ export default {
     };
   },
   mounted() {
-    this.socket = io('http://localhost:3000');
+    this.socket = io(); // Use default (relative) connection
     
     this.socket.on('chat message', (msg) => {
       this.messages.push(msg);

@@ -32,7 +32,7 @@ export default {
       this.error = null;
       const xhr = new XMLHttpRequest();
       // Assumendo che questa vista debba mostrare TUTTI i tecnici (senza filtri avanzati qui)
-      xhr.open('GET', 'http://localhost:3000/tecnici', true);
+      xhr.open('GET', '/tecnici', true);
       xhr.withCredentials = true; // Importante se la route /tecnici richiede auth
 
       xhr.onload = () => {

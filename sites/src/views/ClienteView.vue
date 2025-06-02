@@ -274,7 +274,7 @@ export default {
         params.append("client_lat", this.clientLocation.lat);
         params.append("client_lng", this.clientLocation.lng);
       }
-      const url = `http://localhost:3000/tecnici?${params.toString()}`;
+      const url = `/tecnici?${params.toString()}`;
 
       const xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
@@ -316,7 +316,7 @@ export default {
     fetchAssistenze() {
       this.loadingAssistenze = true;
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', 'http://localhost:3000/assistenze', true);
+      xhr.open('GET', '/assistenze', true);
       xhr.withCredentials = true;
 
       xhr.onload = () => {
@@ -350,7 +350,7 @@ export default {
     getClientLocation() {
       // Step 1: Get profile
       const profileXhr = new XMLHttpRequest();
-      profileXhr.open('GET', 'http://localhost:3000/auth/profile', true);
+      profileXhr.open('GET', '/auth/profile', true);
       profileXhr.withCredentials = true;
 
       profileXhr.onload = () => {
@@ -362,7 +362,7 @@ export default {
 
               // Step 2: Geocode address
               const geocodeXhr = new XMLHttpRequest();
-              const geocodeUrl = `http://localhost:3000/geocode?address=${encodeURIComponent(userAddress)}`;
+              const geocodeUrl = `/geocode?address=${encodeURIComponent(userAddress)}`;
               geocodeXhr.open('GET', geocodeUrl, true);
               geocodeXhr.withCredentials = true; // Anche se forse non serve per geocode
 
@@ -417,7 +417,7 @@ export default {
       // FINE AGGIORNAMENTO PAYLOAD
 
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://localhost:3000/assistenza', true);
+      xhr.open('POST', '/assistenza', true);
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.withCredentials = true;
 

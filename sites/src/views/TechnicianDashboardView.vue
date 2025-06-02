@@ -127,7 +127,7 @@
       fetchAssignedRequests() {
         this.loadingRequests = true;
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', 'http://localhost:3000/tecnici/me/assistenze', true);
+        xhr.open('GET', '/tecnici/me/assistenze', true);
         xhr.withCredentials = true; // Necessario per inviare il cookie di sessione
   
         xhr.onload = () => {
@@ -168,7 +168,7 @@
         this.loadingAction = `${request.id}-${actionType}`; // Imposta ID univoco per il loading del bottone
   
         const xhr = new XMLHttpRequest();
-        xhr.open('PUT', `http://localhost:3000/assistenze/${request.id}/status`, true);
+        xhr.open('PUT', `/assistenze/${request.id}/status`, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.withCredentials = true;
   
